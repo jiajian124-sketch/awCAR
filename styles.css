@@ -2102,35 +2102,53 @@ body.sidebar-open .sidebar-overlay {
     grid-template-columns: 1fr;
   }
   .stock-cards { grid-template-columns: 1fr; }
-  /* 供应商与客户：手机端改为上方标签 + 下列表，右侧信息占满宽 */
-  .contacts-layout {
-    flex-direction: column;
-    gap: 0;
-    min-height: 0;
+}
+
+/* 供应商与客户：≤992px 上（供应商/客户切换）+ 下（列表全宽），苹果/安卓竖屏 */
+@media (max-width: 992px) {
+  #panel-contacts .contacts-card .contacts-layout,
+  .section-body.contacts-card .contacts-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    min-height: 0 !important;
   }
-  .contacts-side {
-    width: 100%;
-    flex-shrink: 0;
-    padding-right: 0;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-right: none;
+  #panel-contacts .contacts-card .contacts-side,
+  .section-body.contacts-card .contacts-side {
+    width: 100% !important;
+    max-width: none !important;
+    flex-shrink: 0 !important;
+    padding-right: 0 !important;
+    padding-bottom: 16px !important;
+    margin-bottom: 16px !important;
+    border-right: none !important;
     border-bottom: 1px solid var(--card-border);
   }
-  .contacts-nav {
-    flex-direction: row;
+  #panel-contacts .contacts-card .contacts-nav,
+  .section-body.contacts-card .contacts-nav {
+    flex-direction: row !important;
     gap: 8px;
   }
-  .contacts-nav-item {
-    flex: 1;
-    text-align: center;
-    padding: 12px 16px;
+  #panel-contacts .contacts-card .contacts-nav-item,
+  .section-body.contacts-card .contacts-nav-item {
+    flex: 1 !important;
+    text-align: center !important;
+    padding: 12px 16px !important;
+    min-height: 44px;
   }
-  .contacts-main {
-    flex: 1;
-    min-width: 0;
-    padding-left: 0;
-    width: 100%;
+  #panel-contacts .contacts-card .contacts-main,
+  .section-body.contacts-card .contacts-main {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+  }
+  #panel-contacts .contacts-card .contacts-main .table-wrap,
+  .section-body.contacts-card .contacts-main .table-wrap {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
 
@@ -2159,13 +2177,28 @@ body.sidebar-open .sidebar-overlay {
   }
   .modal-box { padding: 20px; }
   .settings-section.content-card.card { padding: 16px; }
+  /* 供应商与客户：480px 竖屏再次强制上下布局 */
+  #panel-contacts .contacts-card .contacts-layout { flex-direction: column !important; }
+  #panel-contacts .contacts-card .contacts-side { width: 100% !important; border-right: none !important; border-bottom: 1px solid var(--card-border); }
+  #panel-contacts .contacts-card .contacts-nav { flex-direction: row !important; }
+  #panel-contacts .contacts-card .contacts-nav-item { flex: 1 !important; text-align: center !important; }
+  #panel-contacts .contacts-card .contacts-main { width: 100% !important; padding-left: 0 !important; }
+  #panel-contacts .contacts-card .contacts-main .table-wrap { margin: 0 !important; padding: 0 !important; }
 }
 
-/* 超小屏（如 320px 宽） */
+/* 超小屏（如 320px / 360px 宽） */
 @media (max-width: 360px) {
   .content { padding: 12px 10px 20px; }
   .sidebar { width: 100%; max-width: 280px; }
   .modal-box { max-width: calc(100vw - 20px); margin: 10px; padding: 16px; }
   .data-table th,
   .data-table td { padding: 6px 8px; font-size: 0.75rem; }
+  /* 供应商与客户：360px 再次强制上下布局 + 略减内边距 */
+  #panel-contacts .contacts-card.content-card { padding: 16px; }
+  #panel-contacts .contacts-card .contacts-layout { flex-direction: column !important; }
+  #panel-contacts .contacts-card .contacts-side { width: 100% !important; padding-bottom: 12px; margin-bottom: 12px; border-right: none !important; border-bottom: 1px solid var(--card-border); }
+  #panel-contacts .contacts-card .contacts-nav { flex-direction: row !important; }
+  #panel-contacts .contacts-card .contacts-nav-item { flex: 1 !important; text-align: center !important; padding: 10px 12px !important; min-height: 44px; }
+  #panel-contacts .contacts-card .contacts-main { width: 100% !important; padding-left: 0 !important; }
+  #panel-contacts .contacts-card .contacts-main .table-wrap { margin: 0 !important; padding: 0 !important; }
 }
