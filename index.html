@@ -13,21 +13,44 @@
       <p class="logo-sub">出入库管理 · KIP</p>
     </div>
     <nav class="sidebar-nav">
-      <a href="#" class="nav-item active" data-panel="dashboard"><span class="nav-icon">📊</span>数据看板</a>
-      <a href="#" class="nav-item" data-panel="contacts"><span class="nav-icon">👥</span>供应商与客户</a>
-      <a href="#" class="nav-item" data-panel="stock"><span class="nav-icon">📋</span>库存管理</a>
-      <a href="#" class="nav-item" data-panel="in"><span class="nav-icon">📦</span>入库管理</a>
-      <a href="#" class="nav-item" data-panel="out"><span class="nav-icon">📤</span>出库管理</a>
-      <a href="#" class="nav-item" data-panel="records"><span class="nav-icon">📊</span>记录查询</a>
-      <a href="#" class="nav-item" data-panel="customerStats"><span class="nav-icon">📈</span>客户拿货统计</a>
-      <a href="#" class="nav-item" data-panel="settings"><span class="nav-icon">⚙️</span>系统设置</a>
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">📊 经营概览</div>
+        <div class="sidebar-group-items">
+          <a href="#" class="nav-item active" data-panel="dashboard"><span class="nav-icon">📊</span>数据看板</a>
+          <a href="#" class="nav-item" data-panel="customerStats"><span class="nav-icon">📈</span>客户拿货统计</a>
+          <a href="#" class="nav-item" data-panel="profit"><span class="nav-icon">💰</span>利润统计</a>
+        </div>
+      </div>
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">📦 库存业务</div>
+        <div class="sidebar-group-items">
+          <a href="#" class="nav-item" data-panel="stock"><span class="nav-icon">📋</span>库存管理</a>
+          <a href="#" class="nav-item" data-panel="in"><span class="nav-icon">📦</span>入库管理</a>
+          <a href="#" class="nav-item" data-panel="out"><span class="nav-icon">📤</span>出库管理</a>
+          <a href="#" class="nav-item" data-panel="records"><span class="nav-icon">📋</span>记录查询</a>
+        </div>
+      </div>
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">⚙️ 系统管理</div>
+        <div class="sidebar-group-items">
+          <a href="#" class="nav-item" data-panel="contacts"><span class="nav-icon">👥</span>供应商与客户</a>
+          <a href="#" class="nav-item" data-panel="categories"><span class="nav-icon">📁</span>分类管理</a>
+        </div>
+      </div>
     </nav>
+    <div class="sidebar-data">
+      <button type="button" id="btn-export" class="sidebar-data-btn sidebar-data-export" title="导出全部数据备份">导出</button>
+      <label class="sidebar-data-btn sidebar-data-import file-label" title="从 JSON 文件恢复数据">导入JSON文件<input type="file" id="file-import" accept=".json" hidden></label>
+    </div>
   </aside>
 
   <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="打开菜单"></button>
   <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
   <!-- 右侧主内容：左侧菜单点击后只显示一个模块，其他隐藏 -->
   <div class="app-main">
+    <div id="unsaved-banner" class="unsaved-banner" role="alert" aria-live="polite" style="display:none;">
+      您有未保存的修改，请先点击左侧「导出 JSON」保存后再关闭或离开页面。
+    </div>
     <div id="content" class="content">
       <!-- 数据看板（首页） -->
       <section id="panel-dashboard" class="panel active">
@@ -193,7 +216,6 @@
           </div>
           <div class="section-body">
           <div class="page-actions">
-            <button type="button" id="btn-export-stock-json" class="btn btn-outline">导出 JSON</button>
             <button type="button" id="btn-export-stock-csv" class="btn btn-outline">导出 CSV</button>
           </div>
           <div class="content-card card">
@@ -332,7 +354,7 @@
               <h3 class="in-card-title">入库信息</h3>
             <div class="in-info-grid">
               <div class="field"><label>入库数量 *</label><input type="number" id="in-qty" min="1" required placeholder="必填"></div>
-              <div class="field"><label>成本价(KIP) *</label><input type="number" id="in-costPrice" min="0" step="0.001" placeholder="如 100.000"></div>
+              <div class="field"><label>成本价(KIP) *</label><input type="number" id="in-costPrice" min="0" step="0.001" required placeholder="如 100.000"></div>
               <div class="field"><label>参考售价(KIP)</label><input type="number" id="in-salePrice" min="0" step="0.001" placeholder="如 100.000"></div>
               <div class="field"><label>质量等级</label><select id="in-quality"><option value="正常" selected>正常</option><option value="好">好</option><option value="差">差</option></select></div>
             </div>
@@ -414,6 +436,13 @@
                   <input type="text" id="out-customer" class="out-input out-input-secondary" placeholder="或直接输入客户名称">
                 </div>
                 <div class="out-field">
+                  <label>付款状态</label>
+                  <select id="out-payment-status" class="out-select">
+                    <option value="booked">记账（欠款）</option>
+                    <option value="paid">已付款</option>
+                  </select>
+                </div>
+                <div class="out-field">
                   <label>操作人</label>
                   <input type="text" id="out-operator" class="out-input" value="管理员">
                 </div>
@@ -423,7 +452,6 @@
                 </div>
                 <div class="out-actions">
                   <button type="submit" id="out-submit-btn" class="btn btn-primary btn-out-submit">确认出库</button>
-                  <button type="button" id="btn-print-outbound" class="btn btn-outline btn-out-print">打印出库单</button>
                 </div>
               </div>
             </div>
@@ -475,6 +503,7 @@
               <div class="records-filter-actions">
                 <button type="button" id="btn-records-reset" class="btn btn-secondary">重置</button>
                 <button type="submit" id="btn-records-search" class="btn btn-primary">查询</button>
+                <button type="button" id="btn-records-print-outbound" class="btn btn-outline">打印出库单</button>
               </div>
             </form>
           </div>
@@ -522,6 +551,10 @@
             <form class="filter-form" id="customerStats-filter-form" onsubmit="return false;">
               <div class="filter-fields filter-fields-inline">
                 <div class="form-field">
+                  <label for="customerStats-keyword">客户名称</label>
+                  <input type="text" id="customerStats-keyword" class="filter-input" placeholder="搜索客户，可查拿货时间范围">
+                </div>
+                <div class="form-field">
                   <label for="customerStats-dateFrom">日期起</label>
                   <input type="date" id="customerStats-dateFrom" class="filter-input">
                 </div>
@@ -545,7 +578,9 @@
                   <th>出库笔数</th>
                   <th>总数量</th>
                   <th>总销售额(KIP)</th>
-                  <th>最后拿货日期</th>
+                  <th>当前欠款(KIP)</th>
+                  <th>累计利润(KIP)</th>
+                  <th>拿货时间范围</th>
                 </tr>
               </thead>
               <tbody id="customerStats-tbody"></tbody>
@@ -555,84 +590,110 @@
         </div>
       </section>
 
-      <!-- 系统设置 -->
-      <section id="panel-settings" class="panel">
+      <!-- 利润统计 -->
+      <section id="panel-profit" class="panel">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">利润统计</h2>
+            <p class="page-desc">按日期范围查看销售额、成本与毛利润，支持按日汇总</p>
+          </header>
+          <div class="section-toolbar filter-card card">
+            <form class="filter-form" id="profit-filter-form" onsubmit="return false;">
+              <div class="filter-fields filter-fields-inline">
+                <div class="form-field">
+                  <label for="profit-dateFrom">日期起</label>
+                  <input type="date" id="profit-dateFrom" class="filter-input">
+                </div>
+                <div class="form-field">
+                  <label for="profit-dateTo">日期止</label>
+                  <input type="date" id="profit-dateTo" class="filter-input">
+                </div>
+                <div class="form-field form-field-action">
+                  <label>&nbsp;</label>
+                  <span class="profit-quick-btns">
+                    <button type="button" class="btn btn-outline btn-sm profit-quick" data-range="today">今日</button>
+                    <button type="button" class="btn btn-outline btn-sm profit-quick" data-range="week">本周</button>
+                    <button type="button" class="btn btn-outline btn-sm profit-quick" data-range="month">本月</button>
+                  </span>
+                </div>
+                <div class="filter-actions">
+                  <button type="submit" class="btn btn-primary">查询</button>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div id="profit-range-hint" class="profit-range-hint"></div>
+          <div class="section-body">
+            <div id="profit-cards" class="dashboard-cards profit-cards"></div>
+            <div class="content-card card profit-daily-section">
+              <h3 class="profit-daily-title">按日汇总</h3>
+              <div class="table-wrap">
+                <table class="data-table" id="profit-daily-table">
+                  <thead>
+                    <tr>
+                      <th>日期</th>
+                      <th>出库笔数</th>
+                      <th>出库数量</th>
+                      <th>销售额(KIP)</th>
+                      <th>成本(KIP)</th>
+                      <th>毛利润(KIP)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="profit-daily-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 分类管理 -->
+      <section id="panel-categories" class="panel">
         <div class="page section-module page-settings">
           <header class="section-header page-header">
-            <h2 class="page-title">系统设置</h2>
-            <p class="page-desc">分类管理、报警阈值与数据导入导出</p>
+            <h2 class="page-title">分类管理</h2>
+            <p class="page-desc">车型、主件、子件类别，用于入库与筛选</p>
           </header>
           <div class="section-body">
-          <div class="settings-section content-card card">
-            <h3 class="settings-block-title">分类管理</h3>
-            <p class="settings-block-desc">车型、主件、子件类别，用于入库与筛选</p>
-            <div class="settings-collapse-list">
-              <div class="card collapsible open" data-collapse="models">
-                <button type="button" class="collapsible-head">
-                  <span>车型</span>
-                  <span class="collapsible-arrow"></span>
-                </button>
-                <div class="collapsible-body">
-                  <ul id="list-models" class="cat-list"></ul>
-                  <div class="inline-form">
-                    <input type="text" id="new-model" placeholder="新增车型名称" class="settings-input">
-                    <button type="button" id="add-model" class="btn btn-secondary">添加</button>
+            <div class="settings-section content-card card">
+              <div class="settings-collapse-list">
+                <div class="card collapsible open" data-collapse="models">
+                  <button type="button" class="collapsible-head"><span>车型</span><span class="collapsible-arrow"></span></button>
+                  <div class="collapsible-body">
+                    <ul id="list-models" class="cat-list"></ul>
+                    <div class="inline-form">
+                      <input type="text" id="new-model" placeholder="新增车型名称" class="settings-input">
+                      <button type="button" id="add-model" class="btn btn-secondary">添加</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="card collapsible open" data-collapse="mainTypes">
-                <button type="button" class="collapsible-head">
-                  <span>主件类别</span>
-                  <span class="collapsible-arrow"></span>
-                </button>
-                <div class="collapsible-body">
-                  <ul id="list-mainTypes" class="cat-list"></ul>
-                  <div class="inline-form">
-                    <input type="text" id="new-mainType" placeholder="新增主件类别" class="settings-input">
-                    <button type="button" id="add-mainType" class="btn btn-secondary">添加</button>
+                <div class="card collapsible open" data-collapse="mainTypes">
+                  <button type="button" class="collapsible-head"><span>主件类别</span><span class="collapsible-arrow"></span></button>
+                  <div class="collapsible-body">
+                    <ul id="list-mainTypes" class="cat-list"></ul>
+                    <div class="inline-form">
+                      <input type="text" id="new-mainType" placeholder="新增主件类别" class="settings-input">
+                      <button type="button" id="add-mainType" class="btn btn-secondary">添加</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="card collapsible open" data-collapse="subTypes">
-                <button type="button" class="collapsible-head">
-                  <span>子件类别</span>
-                  <span class="collapsible-arrow"></span>
-                </button>
-                <div class="collapsible-body">
-                  <div class="form-field" style="margin-bottom: 12px;">
-                    <label for="sub-parent">归属主件</label>
-                    <select id="sub-parent"></select>
-                  </div>
-                  <ul id="list-subTypes" class="cat-list"></ul>
-                  <div class="inline-form">
-                    <input type="text" id="new-subType" placeholder="新增子件名称" class="settings-input">
-                    <button type="button" id="add-subType" class="btn btn-secondary">添加</button>
+                <div class="card collapsible open" data-collapse="subTypes">
+                  <button type="button" class="collapsible-head"><span>子件类别</span><span class="collapsible-arrow"></span></button>
+                  <div class="collapsible-body">
+                    <div class="form-field" style="margin-bottom: 12px;">
+                      <label for="sub-parent">归属主件</label>
+                      <select id="sub-parent"></select>
+                    </div>
+                    <ul id="list-subTypes" class="cat-list"></ul>
+                    <div class="inline-form">
+                      <input type="text" id="new-subType" placeholder="新增子件名称" class="settings-input">
+                      <button type="button" id="add-subType" class="btn btn-secondary">添加</button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div class="settings-section content-card card">
-            <h3 class="settings-block-title">报警设置</h3>
-            <p class="settings-block-desc">库存低于阈值时在列表中高亮提示</p>
-            <div class="settings-row">
-              <label for="low-stock-threshold" class="settings-label">低于</label>
-              <input type="number" id="low-stock-threshold" min="0" value="5" class="settings-input-num">
-              <span class="settings-label">件时提示</span>
-              <button type="button" id="save-threshold" class="btn btn-primary">保存</button>
-            </div>
-          </div>
-
-          <div class="settings-section content-card card">
-            <h3 class="settings-block-title">数据管理</h3>
-            <p class="settings-block-desc">导出备份或从 JSON 文件导入数据</p>
-            <div class="settings-row">
-              <button type="button" id="btn-export" class="btn btn-primary">导出 JSON</button>
-              <label class="btn btn-outline file-label">导入 JSON <input type="file" id="file-import" accept=".json" hidden></label>
-              <span class="settings-hint" id="settings-hint"></span>
-            </div>
-          </div>
+            <p class="settings-hint settings-hint-block" id="settings-hint"></p>
           </div>
         </div>
       </section>
