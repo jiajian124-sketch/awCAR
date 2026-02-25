@@ -1,33 +1,33 @@
-/* 阿伟汽配 - 商用后台布局：信息层级清晰、卡片分区、统一留白 */
+/* 阿伟汽配 - 商用内部系统：门店风格、轻米灰背景、分组清晰 */
 :root {
   /* 布局 */
-  --content-bg: #f5f6f8;
+  --content-bg: #f5f2ed;
   --content-max: 1200px;
   --gap: 16px;
   --page-gap: 24px;
-  /* 卡片：白底 + 轻阴影 + 8px 圆角 */
-  --card: #ffffff;
-  --card-border: #e8eaed;
-  --card-radius: 8px;
-  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  /* 卡片：米白底 + 10px 圆角，偏实体风格 */
+  --card: #fdfcfa;
+  --card-border: #e8e4dc;
+  --card-radius: 10px;
+  --card-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
   /* 侧栏 */
-  --sidebar-bg: #2c3e50;
+  --sidebar-bg: #3d4f5c;
   --sidebar-text: #ecf0f1;
-  --sidebar-text-muted: #95a5a6;
-  --sidebar-active: #34495e;
-  --sidebar-hover: #3d566e;
+  --sidebar-text-muted: #9ca8b2;
+  --sidebar-active: #4a5f6e;
+  --sidebar-hover: #546876;
   /* 文字 */
   --text: #2c3e50;
   --text-muted: #6b7280;
-  /* 主色 / 按钮：统一高度 */
-  --accent: #2c3e50;
-  --accent-hover: #34495e;
+  /* 主色：偏中性，非科技蓝 */
+  --accent: #4a5f6e;
+  --accent-hover: #5a6f7e;
   --btn-height: 36px;
-  /* 强调 */
+  /* 状态与强调 */
   --amount: #b45309;
-  --danger: #dc2626;
+  --danger: #c53030;
   --warn: #b45309;
-  --success: #16a34a;
+  --success: #2f8558;
 }
 
 * {
@@ -52,7 +52,7 @@ body .filter-form select {
   text-align: left;
 }
 
-/* ---------- 左侧导航：固定，滚动时始终可见 ---------- */
+/* ---------- 左侧导航：固定高度，仅中间菜单滚动，底部数据备份始终可见 ---------- */
 .sidebar {
   position: fixed;
   left: 0;
@@ -64,42 +64,67 @@ body .filter-form select {
   display: flex;
   flex-direction: column;
   z-index: 100;
+  box-sizing: border-box;
 }
 
 .sidebar-header {
-  padding: 24px 20px;
+  flex-shrink: 0;
+  padding: 18px 18px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .logo {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.18rem;
   font-weight: 600;
   color: #fff;
 }
 
 .logo-sub {
-  margin: 6px 0 0;
-  font-size: 0.8rem;
+  margin: 5px 0 0;
+  font-size: 0.78rem;
   color: var(--sidebar-text-muted);
 }
 
 .sidebar-nav {
-  padding: 16px 0;
+  flex: 1;
+  min-height: 0;
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
+}
+
+.sidebar-group {
+  margin-bottom: 12px;
+}
+
+.sidebar-group:last-of-type { margin-bottom: 0; }
+
+.sidebar-group-title {
+  padding: 6px 18px 4px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--sidebar-text-muted);
+  letter-spacing: 0.02em;
+  margin-left: 0;
+}
+
+.sidebar-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
+  gap: 9px;
+  padding: 10px 18px;
   color: var(--sidebar-text);
   text-decoration: none;
-  font-size: 0.95rem;
-  transition: background 0.15s, color 0.15s;
+  font-size: 0.92rem;
+  transition: none;
 }
 
 .nav-item:hover {
@@ -113,15 +138,81 @@ body .filter-form select {
 }
 
 .nav-icon {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
-/* ---------- 主内容区：留出侧栏宽度，内部滚动 ---------- */
+/* 固定在侧栏底部，一行横向，整体高度 ≤40px */
+.sidebar-data {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: 4px 12px 6px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.sidebar-data-btn {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: var(--sidebar-text);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-align: center;
+  line-height: 26px;
+  transition: none;
+  box-sizing: border-box;
+}
+
+.sidebar-data-btn:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.45);
+  color: #fff;
+}
+
+.sidebar-data-export {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.35);
+  font-weight: 500;
+}
+
+.sidebar-data-import.file-label {
+  margin: 0;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-data-import input {
+  display: none;
+}
+
+/* ---------- 主内容区：留出侧栏宽度，由 body 整体滚动，无独立滚动条 ---------- */
 .app-main {
   margin-left: 220px;
   min-height: 100vh;
-  overflow: auto;
   background: var(--content-bg);
+}
+
+.unsaved-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 10px 20px;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 0.9rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .content {
@@ -420,6 +511,50 @@ body .filter-form select {
   color: var(--text-muted);
 }
 
+/* ---------- 利润统计 ---------- */
+.profit-cards.dashboard-cards {
+  grid-template-columns: repeat(5, 1fr);
+}
+@media (max-width: 900px) {
+  .profit-cards.dashboard-cards { grid-template-columns: repeat(2, 1fr); }
+}
+.profit-range-hint {
+  margin: 8px 0 12px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.profit-quick-btns {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.profit-daily-section.content-card.card {
+  margin-top: var(--page-gap);
+  padding: 20px 24px !important;
+  overflow: visible;
+  box-sizing: border-box;
+}
+.profit-daily-section .profit-daily-title {
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.profit-daily-section .table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.profit-daily-section .data-table {
+  width: 100%;
+  min-width: 0;
+}
+.profit-daily-section .data-table th,
+.profit-daily-section .data-table td {
+  padding: 10px 12px;
+}
+
 /* ---------- 卡片基类 ---------- */
 .card {
   background: var(--card);
@@ -518,7 +653,7 @@ input.readonly {
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   z-index: 50;
 }
 
@@ -793,7 +928,7 @@ input.readonly {
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   z-index: 100;
   padding: 6px 0;
 }
@@ -1168,9 +1303,28 @@ td.cell-amount { font-weight: 700; color: var(--amount); }
 .data-table th.sort-asc .sort-icon::after { content: ' ↑'; opacity: 1; }
 .data-table th.sort-desc .sort-icon::after { content: ' ↓'; opacity: 1; }
 
+.data-table tbody tr {
+  min-height: 48px;
+}
+.data-table tbody td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  vertical-align: middle;
+}
 .data-table tbody tr:hover {
   background: #f8fafc;
 }
+
+.tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.tag-success { background: #dcfce7; color: #166534; }
+.tag-normal  { background: #dbeafe; color: #1e40af; }
+.tag-danger { background: #fee2e2; color: #b91c1c; }
 
 .data-table tbody tr.row-low {
   background: #fef2f2;
@@ -1327,7 +1481,7 @@ td.cell-amount { font-weight: 700; color: var(--amount); }
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
   border-top: 6px solid var(--text-muted);
-  transition: transform 0.2s;
+  transition: transform 0.12s;
   flex-shrink: 0;
 }
 
@@ -1580,7 +1734,7 @@ body.modal-open {
   background: var(--card);
   border-radius: 10px;
   border: 1px solid var(--card-border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   padding: 24px;
   margin: auto;
 }
@@ -1876,7 +2030,7 @@ body.modal-open {
   object-fit: contain;
   image-rendering: auto;
   image-rendering: -webkit-optimize-contrast;
-  transition: transform 0.15s ease;
+  transition: transform 0.1s ease;
   transform-origin: center center;
 }
 
@@ -1942,8 +2096,8 @@ body.modal-open {
   font-size: 1rem;
   font-weight: 600;
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  transition: transform 0.3s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: transform 0.1s ease;
   pointer-events: none;
   opacity: 0;
 }
@@ -1973,7 +2127,7 @@ body.modal-open {
   border: 1px solid var(--card-border);
   border-radius: 8px;
   background: var(--card);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   cursor: pointer;
   color: var(--text);
   font-size: 1.25rem;
@@ -1991,7 +2145,7 @@ body.modal-open {
   background: rgba(0,0,0,0.4);
   z-index: 99;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.1s ease;
 }
 body.sidebar-open .sidebar-overlay {
   display: block;
@@ -2000,15 +2154,17 @@ body.sidebar-open .sidebar-overlay {
 
 @media (max-width: 768px) {
   html { overflow-x: hidden; }
+  body { overflow-x: hidden; }
   body.sidebar-open { overflow: hidden; }
   .app-main { overflow-x: hidden; }
+  .unsaved-banner { padding-top: 48px; }
   .sidebar-toggle {
     display: block;
   }
   .sidebar {
     width: 260px;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
+    transition: transform 0.1s ease;
   }
   body.sidebar-open .sidebar {
     transform: translateX(0);
@@ -2021,10 +2177,11 @@ body.sidebar-open .sidebar-overlay {
   }
   .content {
     padding: var(--page-gap) 16px 32px;
+    max-width: 100%;
   }
   .page-title { font-size: 1.2rem; }
   .page-desc { font-size: 0.85rem; }
-  /* iOS：输入框至少 16px 避免聚焦时自动放大 */
+  /* 手机端表单：输入框全宽、字号 16px 避免 iOS 放大 */
   .filter-form input,
   .filter-form select,
   .field input,
@@ -2036,15 +2193,20 @@ body.sidebar-open .sidebar-overlay {
   .out-select,
   .contacts-search {
     font-size: 16px !important;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .form-field .filter-input,
-  .form-field select { font-size: 16px; }
+  .form-field select { font-size: 16px; min-width: 0; }
   .filter-form {
     gap: 12px 16px;
   }
   .filter-form .form-field {
     min-width: 0;
+    flex: 1 1 100%;
   }
+  .filter-form .filter-input,
+  .filter-form select { width: 100%; }
   .dashboard-cards {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
