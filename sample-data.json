@@ -1,0 +1,252 @@
+{
+  "exportTime": "2025-02-23T10:00:00.000Z",
+  "parts": [
+    {
+      "id": "id_p001",
+      "code": "THV-ENG-001",
+      "name": "机油滤清器",
+      "brand": "丰田纯牌",
+      "modelId": "m1",
+      "mainTypeId": "t1",
+      "subTypeId": "s1",
+      "quantity": 28,
+      "unit": "KIP",
+      "supplier": "曼谷丰田配件中心",
+      "createdAt": "2025-02-01T08:00:00.000Z",
+      "updatedAt": "2025-02-20T14:30:00.000Z"
+    },
+    {
+      "id": "id_p002",
+      "code": "THV-BRK-002",
+      "name": "前刹车片套装",
+      "brand": "Denso",
+      "modelId": "m1",
+      "mainTypeId": "t3",
+      "subTypeId": "s6",
+      "quantity": 6,
+      "unit": "KIP",
+      "supplier": "泰国制动件供应商",
+      "createdAt": "2025-02-05T09:00:00.000Z",
+      "updatedAt": "2025-02-22T11:00:00.000Z"
+    },
+    {
+      "id": "id_p003",
+      "code": "THR-BAT-001",
+      "name": "蓄电池 12V 70AH",
+      "brand": "GS",
+      "modelId": "m2",
+      "mainTypeId": "t4",
+      "subTypeId": "s8",
+      "quantity": 3,
+      "unit": "KIP",
+      "supplier": "本地电瓶批发",
+      "createdAt": "2025-02-10T10:00:00.000Z",
+      "updatedAt": "2025-02-21T16:00:00.000Z"
+    },
+    {
+      "id": "id_p004",
+      "code": "THV-AC-001",
+      "name": "空调压缩机",
+      "brand": "Denso",
+      "modelId": "m1",
+      "mainTypeId": "t6",
+      "subTypeId": "s11",
+      "quantity": 2,
+      "unit": "KIP",
+      "supplier": "曼谷丰田配件中心",
+      "createdAt": "2025-02-12T08:00:00.000Z",
+      "updatedAt": "2025-02-18T09:00:00.000Z"
+    },
+    {
+      "id": "id_p005",
+      "code": "THV-TRX-001",
+      "name": "变速箱油 4L",
+      "brand": "丰田纯牌",
+      "modelId": "m1",
+      "mainTypeId": "t2",
+      "subTypeId": "s4",
+      "quantity": 15,
+      "unit": "KIP",
+      "supplier": "曼谷丰田配件中心",
+      "createdAt": "2025-02-03T09:00:00.000Z",
+      "updatedAt": "2025-02-22T14:00:00.000Z"
+    },
+    {
+      "id": "id_p006",
+      "code": "THR-LGT-001",
+      "name": "前大灯总成 左",
+      "brand": "原厂",
+      "modelId": "m2",
+      "mainTypeId": "t4",
+      "subTypeId": "s9",
+      "quantity": 4,
+      "unit": "KIP",
+      "supplier": "曼谷丰田配件中心",
+      "createdAt": "2025-02-08T11:00:00.000Z",
+      "updatedAt": "2025-02-19T10:00:00.000Z"
+    },
+    {
+      "id": "id_p007",
+      "code": "THV-FUEL-001",
+      "name": "燃油滤清器",
+      "brand": "Denso",
+      "modelId": "m1",
+      "mainTypeId": "t1",
+      "subTypeId": "s3",
+      "quantity": 12,
+      "unit": "KIP",
+      "supplier": "泰国制动件供应商",
+      "createdAt": "2025-02-06T08:30:00.000Z",
+      "updatedAt": "2025-02-20T15:00:00.000Z"
+    },
+    {
+      "id": "id_p008",
+      "code": "GEN-BRK-001",
+      "name": "刹车盘 前",
+      "brand": "其他",
+      "modelId": "m3",
+      "mainTypeId": "t3",
+      "subTypeId": "s6",
+      "quantity": 8,
+      "unit": "KIP",
+      "supplier": "通用配件商",
+      "createdAt": "2025-02-15T09:00:00.000Z",
+      "updatedAt": "2025-02-22T12:00:00.000Z"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "id_tx001",
+      "partId": "id_p001",
+      "partCode": "THV-ENG-001",
+      "type": "in",
+      "quantity": 20,
+      "supplierOrCustomer": "曼谷丰田配件中心",
+      "operator": "管理员",
+      "time": "2025-02-01T08:00:00.000Z"
+    },
+    {
+      "id": "id_tx002",
+      "partId": "id_p001",
+      "partCode": "THV-ENG-001",
+      "type": "in",
+      "quantity": 10,
+      "supplierOrCustomer": "曼谷丰田配件中心",
+      "operator": "管理员",
+      "time": "2025-02-10T09:00:00.000Z"
+    },
+    {
+      "id": "id_tx003",
+      "partId": "id_p001",
+      "partCode": "THV-ENG-001",
+      "type": "out",
+      "quantity": 2,
+      "supplierOrCustomer": "清迈修理厂",
+      "operator": "管理员",
+      "time": "2025-02-15T14:00:00.000Z"
+    },
+    {
+      "id": "id_tx004",
+      "partId": "id_p002",
+      "partCode": "THV-BRK-002",
+      "type": "in",
+      "quantity": 10,
+      "supplierOrCustomer": "泰国制动件供应商",
+      "operator": "管理员",
+      "time": "2025-02-05T09:00:00.000Z"
+    },
+    {
+      "id": "id_tx005",
+      "partId": "id_p002",
+      "partCode": "THV-BRK-002",
+      "type": "out",
+      "quantity": 4,
+      "supplierOrCustomer": "芭提雅客户",
+      "operator": "管理员",
+      "time": "2025-02-22T11:00:00.000Z"
+    },
+    {
+      "id": "id_tx006",
+      "partId": "id_p003",
+      "partCode": "THR-BAT-001",
+      "type": "in",
+      "quantity": 5,
+      "supplierOrCustomer": "本地电瓶批发",
+      "operator": "管理员",
+      "time": "2025-02-10T10:00:00.000Z"
+    },
+    {
+      "id": "id_tx007",
+      "partId": "id_p003",
+      "partCode": "THR-BAT-001",
+      "type": "out",
+      "quantity": 2,
+      "supplierOrCustomer": "普吉岛维修站",
+      "operator": "管理员",
+      "time": "2025-02-21T16:00:00.000Z"
+    },
+    {
+      "id": "id_tx008",
+      "partId": "id_p004",
+      "partCode": "THV-AC-001",
+      "type": "in",
+      "quantity": 2,
+      "supplierOrCustomer": "曼谷丰田配件中心",
+      "operator": "管理员",
+      "time": "2025-02-12T08:00:00.000Z"
+    },
+    {
+      "id": "id_tx009",
+      "partId": "id_p005",
+      "partCode": "THV-TRX-001",
+      "type": "in",
+      "quantity": 15,
+      "supplierOrCustomer": "曼谷丰田配件中心",
+      "operator": "管理员",
+      "time": "2025-02-03T09:00:00.000Z"
+    },
+    {
+      "id": "id_tx010",
+      "partId": "id_p006",
+      "partCode": "THR-LGT-001",
+      "type": "out",
+      "quantity": 1,
+      "supplierOrCustomer": "私人客户",
+      "operator": "管理员",
+      "time": "2025-02-19T10:00:00.000Z"
+    }
+  ],
+  "models": [
+    { "id": "m1", "name": "Toyota Hilux Vigo" },
+    { "id": "m2", "name": "Toyota Hilux Revo" },
+    { "id": "m3", "name": "其他车型" }
+  ],
+  "mainTypes": [
+    { "id": "t1", "name": "发动机系统" },
+    { "id": "t2", "name": "底盘传动" },
+    { "id": "t3", "name": "制动系统" },
+    { "id": "t4", "name": "电气系统" },
+    { "id": "t5", "name": "车身外观" },
+    { "id": "t6", "name": "空调冷却" },
+    { "id": "t7", "name": "悬挂转向" },
+    { "id": "t8", "name": "其他" }
+  ],
+  "subTypes": [
+    { "id": "s1", "mainTypeId": "t1", "name": "发动机总成" },
+    { "id": "s2", "mainTypeId": "t1", "name": "进排气" },
+    { "id": "s3", "mainTypeId": "t1", "name": "燃油系统" },
+    { "id": "s4", "mainTypeId": "t2", "name": "变速箱" },
+    { "id": "s5", "mainTypeId": "t2", "name": "传动轴/半轴" },
+    { "id": "s6", "mainTypeId": "t3", "name": "刹车片/盘" },
+    { "id": "s7", "mainTypeId": "t3", "name": "制动泵/分泵" },
+    { "id": "s8", "mainTypeId": "t4", "name": "蓄电池/发电机" },
+    { "id": "s9", "mainTypeId": "t4", "name": "灯光/线束" },
+    { "id": "s10", "mainTypeId": "t5", "name": "保险杠/饰条" },
+    { "id": "s11", "mainTypeId": "t6", "name": "压缩机/冷凝器" },
+    { "id": "s12", "mainTypeId": "t8", "name": "其他" }
+  ],
+  "settings": {
+    "lowStockThreshold": 5,
+    "defaultOperator": "管理员"
+  }
+}

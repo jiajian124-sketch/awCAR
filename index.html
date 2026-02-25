@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阿伟汽配 - 出入库管理系统</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1 class="logo">阿伟汽配</h1>
+      <p class="logo-sub">出入库管理 · KIP</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-panel="dashboard"><span class="nav-icon">📊</span>数据看板</a>
+      <a href="#" class="nav-item" data-panel="contacts"><span class="nav-icon">👥</span>供应商与客户</a>
+      <a href="#" class="nav-item" data-panel="stock"><span class="nav-icon">📋</span>库存管理</a>
+      <a href="#" class="nav-item" data-panel="in"><span class="nav-icon">📦</span>入库管理</a>
+      <a href="#" class="nav-item" data-panel="out"><span class="nav-icon">📤</span>出库管理</a>
+      <a href="#" class="nav-item" data-panel="records"><span class="nav-icon">📊</span>记录查询</a>
+      <a href="#" class="nav-item" data-panel="customerStats"><span class="nav-icon">📈</span>客户拿货统计</a>
+      <a href="#" class="nav-item" data-panel="settings"><span class="nav-icon">⚙️</span>系统设置</a>
+    </nav>
+  </aside>
+
+  <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="打开菜单"></button>
+  <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+  <!-- 右侧主内容：左侧菜单点击后只显示一个模块，其他隐藏 -->
+  <div class="app-main">
+    <div id="content" class="content">
+      <!-- 数据看板（首页） -->
+      <section id="panel-dashboard" class="panel active">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">数据看板</h2>
+            <p class="page-desc">库存与出入库概览，老板一眼看懂</p>
+          </header>
+          <div class="section-body">
+          <div id="dashboard-cards" class="dashboard-cards"></div>
+          <div class="dashboard-low-block content-card card">
+          <div class="dashboard-low-head">
+            <h3 class="dashboard-low-title">低库存预警</h3>
+            <span class="dashboard-low-threshold" id="dashboard-threshold-tip">最低警戒值：<strong id="dashboard-threshold-value">5</strong></span>
+            <a href="#" class="btn btn-primary dashboard-goto-stock" data-panel="stock">去库存管理</a>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table data-table-compact">
+              <thead><tr><th>编码</th><th>名称</th><th>库存</th><th>状态</th></tr></thead>
+              <tbody id="dashboard-low-tbody"></tbody>
+            </table>
+          </div>
+          <p class="dashboard-block-more" id="dashboard-low-more"></p>
+          </div>
+          <div class="dashboard-out-block content-card card">
+          <h3 class="dashboard-block-title">最近出库</h3>
+          <div class="table-wrap">
+            <table class="data-table data-table-compact">
+              <thead><tr><th>时间</th><th>配件</th><th>数量</th><th>客户</th></tr></thead>
+              <tbody id="dashboard-out-tbody"></tbody>
+            </table>
+          </div>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 供应商与客户 -->
+      <section id="panel-contacts" class="panel">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">供应商与客户管理</h2>
+            <p class="page-desc">维护供应商、客户档案，入库/出库时可选择</p>
+          </header>
+          <div class="section-toolbar contacts-toolbar-wrap">
+            <input type="text" id="contacts-search" class="contacts-search" placeholder="按名称或电话搜索">
+            <button type="button" id="contacts-btn-add" class="btn btn-primary">添加</button>
+          </div>
+          <div class="section-body content-card card contacts-card">
+            <div class="contacts-layout">
+              <aside class="contacts-side">
+                <nav class="contacts-nav">
+                  <button type="button" class="contacts-nav-item active" data-tab="suppliers">供应商</button>
+                  <button type="button" class="contacts-nav-item" data-tab="customers">客户</button>
+                </nav>
+              </aside>
+              <div class="contacts-main">
+                <div class="table-wrap">
+                <table class="data-table" id="contacts-table">
+                  <thead>
+                    <tr id="contacts-thead-row">
+                      <!-- 供应商: 名称 联系人 电话 地址 备注 创建时间 操作 -->
+                      <!-- 客户: 名称 联系方式 备注 创建时间 操作 -->
+                    </tr>
+                  </thead>
+                  <tbody id="contacts-tbody"></tbody>
+                </table>
+                </div>
+                <div class="contacts-pagination" id="contacts-pagination"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="contacts-modal" class="modal" aria-hidden="true">
+          <div class="modal-overlay"></div>
+          <div class="modal-box">
+            <h3 class="modal-title" id="contacts-modal-title">添加</h3>
+            <form id="contacts-modal-form">
+              <input type="hidden" id="contacts-modal-id" value="">
+              <div class="modal-body">
+                <div class="field">
+                  <label id="contacts-modal-name-label">名称</label>
+                  <input type="text" id="contacts-modal-name" required placeholder="">
+                </div>
+                <div class="field" id="contacts-field-contact-wrap">
+                  <label>联系人</label>
+                  <input type="text" id="contacts-modal-contact" placeholder="联系人">
+                </div>
+                <div class="field">
+                  <label>地址</label>
+                  <input type="text" id="contacts-modal-address" placeholder="地址">
+                </div>
+                <div class="field">
+                  <label>联系电话</label>
+                  <input type="text" id="contacts-modal-phone" placeholder="联系电话">
+                </div>
+                <div class="field">
+                  <label>备注</label>
+                  <input type="text" id="contacts-modal-remark" placeholder="备注">
+                </div>
+                <div class="field" id="contacts-modal-created-wrap" style="display:none;">
+                  <label>创建时间</label>
+                  <span id="contacts-modal-created-text">-</span>
+                </div>
+              </div>
+              <div class="modal-actions">
+                <button type="button" id="contacts-modal-cancel" class="btn btn-outline">取消</button>
+                <button type="submit" class="btn btn-primary">确定</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 库存管理 -->
+      <section id="panel-stock" class="panel">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">库存管理</h2>
+            <p class="page-desc">核心列表解决大部分需求，详情与流水在操作中查看</p>
+          </header>
+          <div class="section-toolbar filter-card card">
+            <form class="filter-form" id="stock-filter-form" onsubmit="return false;">
+              <div class="filter-fields">
+                <div class="form-field">
+                  <label for="search-input">关键词</label>
+                  <input type="text" id="search-input" class="filter-input" placeholder="编码/名称/品牌/车型">
+                </div>
+                <div class="form-field">
+                  <label for="filter-model">车型</label>
+                  <select id="filter-model"></select>
+                </div>
+                <div class="form-field">
+                  <label for="filter-mainType">主件</label>
+                  <select id="filter-mainType"></select>
+                </div>
+                <div class="form-field">
+                  <label for="filter-brand">品牌</label>
+                  <select id="filter-brand"><option value="">全部品牌</option></select>
+                </div>
+                <div class="form-field">
+                  <label for="filter-supplier">供应商</label>
+                  <select id="filter-supplier"><option value="">全部供应商</option></select>
+                </div>
+                <div class="form-field form-field-range">
+                  <label>库存范围</label>
+                  <span class="range-inputs">
+                    <input type="number" id="filter-stock-min" placeholder="最小" min="0" class="filter-input">
+                    <span class="range-sep">～</span>
+                    <input type="number" id="filter-stock-max" placeholder="最大" min="0" class="filter-input">
+                  </span>
+                </div>
+                <div class="form-field form-field-action">
+                  <label>&nbsp;</label>
+                  <button type="button" id="filter-low-only" class="btn btn-outline">仅低库存</button>
+                </div>
+              </div>
+              <div class="filter-actions">
+                <button type="button" id="btn-reset" class="btn btn-secondary">重置</button>
+                <button type="button" id="btn-search" class="btn btn-primary">搜索</button>
+              </div>
+            </form>
+          </div>
+          <div class="section-body">
+          <div class="page-actions">
+            <button type="button" id="btn-export-stock-json" class="btn btn-outline">导出 JSON</button>
+            <button type="button" id="btn-export-stock-csv" class="btn btn-outline">导出 CSV</button>
+          </div>
+          <div class="content-card card">
+            <div class="table-wrap">
+              <table class="data-table data-table-stock" id="stock-table">
+              <thead>
+                <tr>
+                  <th data-sort="code">编码 <span class="sort-icon"></span></th>
+                  <th data-sort="name">名称 <span class="sort-icon"></span></th>
+                  <th data-sort="brand">品牌 <span class="sort-icon"></span></th>
+                  <th data-sort="quantity">库存 <span class="sort-icon"></span></th>
+                  <th data-sort="costPrice">成本价 <span class="sort-icon"></span></th>
+                  <th data-sort="salePrice">售价 <span class="sort-icon"></span></th>
+                  <th data-sort="stockValue">库存金额 <span class="sort-icon"></span></th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="stock-tbody"></tbody>
+            </table>
+            </div>
+          </div>
+          </div>
+        </div>
+        <div id="stock-detail-modal" class="modal" aria-hidden="true" data-batch-id="">
+          <div class="modal-overlay"></div>
+          <div class="modal-box">
+            <h3 class="modal-title" id="stock-detail-title">配件详情</h3>
+            <div class="stock-detail-image-wrap" id="stock-detail-image-wrap"></div>
+            <dl class="detail-dl" id="stock-detail-body"></dl>
+            <div class="modal-actions modal-actions-multi">
+              <button type="button" class="btn btn-outline btn-stock-detail-log" id="stock-detail-btn-log">查看流水</button>
+              <button type="button" class="btn btn-primary btn-stock-detail-edit" id="stock-detail-btn-edit">编辑</button>
+              <button type="button" class="btn btn-warning btn-stock-detail-delete" id="stock-detail-btn-delete">删除</button>
+              <button type="button" id="stock-detail-close" class="btn btn-secondary">关闭</button>
+            </div>
+          </div>
+        </div>
+        <div id="stock-edit-modal" class="modal" aria-hidden="true">
+          <div class="modal-overlay"></div>
+          <div class="modal-box modal-box-wide">
+            <h3 class="modal-title">编辑配件</h3>
+            <form id="stock-edit-form">
+              <input type="hidden" id="stock-edit-id" value="">
+              <input type="hidden" id="stock-edit-product-id" value="">
+              <div class="form-in-grid">
+                <div class="field"><label>配件编码</label><input type="text" id="stock-edit-code" readonly class="readonly"></div>
+                <div class="field"><label>名称</label><input type="text" id="stock-edit-name" required></div>
+                <div class="field"><label>品牌</label><input type="text" id="stock-edit-brand" placeholder="品牌"></div>
+                <div class="field"><label>单位</label><input type="text" id="stock-edit-unit" placeholder="KIP"></div>
+                <div class="field"><label>成本价(KIP)</label><input type="number" id="stock-edit-costPrice" min="0" step="0.001" placeholder="如 100.000"></div>
+                <div class="field"><label>参考售价(KIP)</label><input type="number" id="stock-edit-salePrice" min="0" step="0.001" placeholder="如 100.000"></div>
+                <div class="field"><label>厂家</label><input type="text" id="stock-edit-supplier" placeholder="供应商/厂家"></div>
+                <div class="field"><label>质量</label><select id="stock-edit-quality"><option value="">请选择</option></select></div>
+                <div class="field"><label>库存数量</label><input type="number" id="stock-edit-qty" min="0"></div>
+                <div class="field"><label>车型</label><select id="stock-edit-model"></select></div>
+                <div class="field"><label>主件类别</label><select id="stock-edit-mainType"></select></div>
+                <div class="field"><label>子件类别</label><select id="stock-edit-subType"></select></div>
+                <div class="field field-image-upload">
+                  <label>更换图片</label>
+                  <input type="file" id="stock-edit-imageFile" accept="image/*">
+                  <span class="image-preview-wrap"><img id="stock-edit-imagePreview" alt="" class="image-preview"></span>
+                </div>
+              </div>
+              <div class="modal-actions">
+                <button type="button" id="stock-edit-cancel" class="btn btn-outline">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div id="stock-log-modal" class="modal" aria-hidden="true">
+          <div class="modal-overlay"></div>
+          <div class="modal-box modal-box-wide">
+            <h3 class="modal-title" id="stock-log-title">库存流水</h3>
+            <div class="stock-log-summary" id="stock-log-summary"></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>时间</th><th>类型</th><th>数量</th><th>对方</th><th>操作人</th></tr></thead>
+                <tbody id="stock-log-tbody"></tbody>
+              </table>
+            </div>
+            <div class="modal-actions">
+              <button type="button" id="stock-log-close" class="btn btn-outline">关闭</button>
+            </div>
+          </div>
+        </div>
+        <div id="image-viewer-modal" class="modal" aria-hidden="true">
+          <div class="modal-overlay"></div>
+          <div class="modal-box image-viewer-box">
+            <div class="image-viewer-toolbar">
+              <button type="button" id="image-viewer-zoom-out" class="btn btn-outline btn-sm">缩小</button>
+              <span id="image-viewer-scale" class="image-viewer-scale">100%</span>
+              <button type="button" id="image-viewer-zoom-in" class="btn btn-outline btn-sm">放大</button>
+              <button type="button" id="image-viewer-close" class="btn btn-outline btn-sm">关闭</button>
+            </div>
+            <div class="image-viewer-wrap">
+              <img id="image-viewer-img" src="" alt="">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 入库管理 -->
+      <section id="panel-in" class="panel">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">入库管理</h2>
+            <p class="page-desc">搜索配件 → 输入数量 → 回车确认。高级信息可折叠。</p>
+          </header>
+          <div class="section-body content-card card">
+            <div class="in-mode-switch">
+          <label class="in-mode-opt"><input type="radio" name="in-mode" value="existing" checked> <span>现有配件入库</span></label>
+          <label class="in-mode-opt"><input type="radio" name="in-mode" value="new"> <span>新配件建档并入库</span></label>
+        </div>
+
+          <form id="form-in" class="form-in">
+            <div class="in-card-block">
+              <h3 class="in-card-title">选择配件</h3>
+            <div id="in-existing-block" class="in-part-block">
+              <div class="in-part-search-wrap">
+                <input type="text" id="in-part-search" class="in-part-search" placeholder="搜索编码或名称，选中后自动带出信息" autocomplete="off">
+                <div id="in-part-dropdown" class="in-part-dropdown" style="display:none;"></div>
+              </div>
+              <input type="hidden" id="in-selected-part-id" value="">
+                <div id="in-part-summary" class="in-part-summary"></div>
+            </div>
+            <div id="in-new-block" class="in-new-block" style="display:none;">
+              <div class="in-new-row">
+                <div class="field"><label>配件编码 *</label><input type="text" id="in-code" placeholder="如 P-001"></div>
+                <div class="field"><label>配件名称 *</label><input type="text" id="in-name" placeholder="配件名称"></div>
+              </div>
+            </div>
+            </div>
+            <div class="in-card-block">
+              <h3 class="in-card-title">入库信息</h3>
+            <div class="in-info-grid">
+              <div class="field"><label>入库数量 *</label><input type="number" id="in-qty" min="1" required placeholder="必填"></div>
+              <div class="field"><label>成本价(KIP) *</label><input type="number" id="in-costPrice" min="0" step="0.001" placeholder="如 100.000"></div>
+              <div class="field"><label>参考售价(KIP)</label><input type="number" id="in-salePrice" min="0" step="0.001" placeholder="如 100.000"></div>
+              <div class="field"><label>质量等级</label><select id="in-quality"><option value="正常" selected>正常</option><option value="好">好</option><option value="差">差</option></select></div>
+            </div>
+              <div class="in-meta-row">
+                <div class="field"><label>厂家</label><select id="in-supplier-select"><option value="">-- 选择或输入 --</option></select><input type="text" id="in-supplier" placeholder="或直接输入" class="in-supplier-input"></div>
+                <div class="field"><label>操作人</label><input type="text" id="in-operator" value="管理员"></div>
+              </div>
+            </div>
+            <div id="in-advanced-wrap" class="in-card-block in-advanced-wrap" style="display:none;">
+            <button type="button" class="in-advanced-head collapsible-head">
+              <span>更多信息（新建配件时填写）</span>
+              <span class="collapsible-arrow"></span>
+            </button>
+            <div class="in-advanced-body collapsible-body">
+              <div class="in-advanced-grid">
+                <div class="field"><label>品牌</label><input type="text" id="in-brand" placeholder="品牌"></div>
+                <div class="field"><label>车型</label><select id="in-model"></select></div>
+                <div class="field"><label>主件类别</label><select id="in-mainType"></select></div>
+                <div class="field"><label>子件类别</label><select id="in-subType"></select></div>
+                <div class="field field-image-upload">
+                  <label>配件图片</label>
+                  <input type="file" id="in-imageFile" accept="image/*">
+                  <span class="image-preview-wrap"><img id="in-imagePreview" alt="" class="image-preview"></span>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="in-submit-wrap">
+              <button type="submit" id="in-submit-btn" class="btn btn-primary">确认入库</button>
+            </div>
+          </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 出库管理 -->
+      <section id="panel-out" class="panel">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">出库管理</h2>
+            <p class="page-desc">搜索配件 → 数量自动聚焦 → 选客户 → 回车完成。按先进先出扣减。</p>
+          </header>
+          <div class="section-body content-card card">
+        <form id="form-out" class="form-out">
+          <div class="out-layout">
+            <div class="out-left">
+              <div class="card section-block out-card">
+                <h3 class="out-card-title">出库 · 选择配件</h3>
+                <div class="out-field">
+                  <label>搜索</label>
+                  <input type="text" id="out-search" class="out-input" placeholder="输入编码或名称筛选" autocomplete="off">
+                </div>
+                <div class="out-field">
+                  <label>配件</label>
+                  <select id="out-part" class="out-select"></select>
+                </div>
+                <div id="out-stock-card" class="out-stock-card">
+                  <div class="out-stock-card-inner">
+                    <div class="out-stock-label">库存状态</div>
+                    <div id="out-stock-current" class="out-stock-current">—</div>
+                    <div id="out-stock-threshold" class="out-stock-meta">最低警戒：— 件</div>
+                    <div id="out-stock-status" class="out-stock-status">—</div>
+                  </div>
+                </div>
+                <div class="out-field">
+                  <label>出库数量</label>
+                  <input type="number" id="out-qty" class="out-input" min="1" required placeholder="数量">
+                </div>
+                <div id="out-insufficient-warn" class="out-insufficient-warn" style="display:none;"></div>
+              </div>
+            </div>
+
+            <div class="out-right">
+              <div class="card section-block out-card">
+                <h3 class="out-card-title">出库信息</h3>
+                <div class="out-field">
+                  <label>客户</label>
+                  <select id="out-customer-select" class="out-select"><option value="">— 选择或输入 —</option></select>
+                  <input type="text" id="out-customer" class="out-input out-input-secondary" placeholder="或直接输入客户名称">
+                </div>
+                <div class="out-field">
+                  <label>操作人</label>
+                  <input type="text" id="out-operator" class="out-input" value="管理员">
+                </div>
+                <div id="out-preview" class="out-preview">
+                  <div class="out-preview-title">即将出库</div>
+                  <div id="out-preview-body" class="out-preview-body">请先选择配件、填写数量与客户</div>
+                </div>
+                <div class="out-actions">
+                  <button type="submit" id="out-submit-btn" class="btn btn-primary btn-out-submit">确认出库</button>
+                  <button type="button" id="btn-print-outbound" class="btn btn-outline btn-out-print">打印出库单</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 记录查询 -->
+      <section id="panel-records" class="panel">
+        <div class="page section-module records-page">
+          <header class="section-header page-header">
+            <h2 class="page-title">记录查询</h2>
+            <p class="page-desc">出入库汇总、按供应商/客户统计与明细</p>
+          </header>
+          <div class="section-toolbar filter-card card records-filter-card">
+            <div class="records-tabs">
+              <button type="button" class="records-tab active" data-record-type="in">入库记录</button>
+              <button type="button" class="records-tab" data-record-type="out">出库记录</button>
+            </div>
+            <form class="records-filter-form" id="records-filter-form">
+              <div class="records-filter-grid">
+                <div class="form-field">
+                  <label for="records-keyword">配件编码/名称</label>
+                  <input type="text" id="records-keyword" placeholder="请输入编码或名称">
+                </div>
+                <div class="form-field">
+                  <label for="records-model">车型</label>
+                  <select id="records-model"><option value="">全部车型</option></select>
+                </div>
+                <div class="form-field">
+                  <label for="records-supplier">供应商</label>
+                  <select id="records-supplier"><option value="">全部供应商</option></select>
+                </div>
+                <div class="form-field">
+                  <label for="records-customer">客户</label>
+                  <select id="records-customer"><option value="">全部客户</option></select>
+                </div>
+                <div class="form-field">
+                  <label for="records-dateFrom">日期起</label>
+                  <input type="date" id="records-dateFrom">
+                </div>
+                <div class="form-field">
+                  <label for="records-dateTo">日期止</label>
+                  <input type="date" id="records-dateTo">
+                </div>
+              </div>
+              <div class="records-filter-actions">
+                <button type="button" id="btn-records-reset" class="btn btn-secondary">重置</button>
+                <button type="submit" id="btn-records-search" class="btn btn-primary">查询</button>
+              </div>
+            </form>
+          </div>
+          <div id="records-stats" class="content-card card records-stats-block"></div>
+          <div class="section-body content-card card records-table-card">
+            <div class="table-wrap records-table-wrap">
+              <table class="data-table data-table-records" id="records-table">
+                <thead>
+                  <tr>
+                    <th>编码</th>
+                    <th>名称</th>
+                    <th>类型</th>
+                    <th>数量</th>
+                    <th>供应商/客户</th>
+                    <th>时间</th>
+                  </tr>
+                </thead>
+                <tbody id="records-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 记录详情弹窗 -->
+        <div id="record-detail-modal" class="modal record-detail-modal" aria-hidden="true">
+          <div class="modal-overlay"></div>
+          <div class="modal-box record-detail-box">
+            <h3 class="modal-title">记录详情</h3>
+            <dl class="record-detail-dl" id="record-detail-body"></dl>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary record-detail-close">关闭</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 客户拿货统计 -->
+      <section id="panel-customerStats" class="panel">
+        <div class="page section-module">
+          <header class="section-header page-header">
+            <h2 class="page-title">客户拿货统计</h2>
+            <p class="page-desc">按客户汇总出库笔数、总数量、总销售额与最后拿货日期</p>
+          </header>
+          <div class="section-toolbar filter-card card">
+            <form class="filter-form" id="customerStats-filter-form" onsubmit="return false;">
+              <div class="filter-fields filter-fields-inline">
+                <div class="form-field">
+                  <label for="customerStats-dateFrom">日期起</label>
+                  <input type="date" id="customerStats-dateFrom" class="filter-input">
+                </div>
+                <div class="form-field">
+                  <label for="customerStats-dateTo">日期止</label>
+                  <input type="date" id="customerStats-dateTo" class="filter-input">
+                </div>
+                <div class="filter-actions">
+                  <button type="button" id="btn-customerStats-reset" class="btn btn-secondary">重置</button>
+                  <button type="button" id="btn-customerStats-search" class="btn btn-primary">查询</button>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="section-body content-card card">
+          <div class="table-wrap">
+            <table class="data-table data-table-compact">
+              <thead>
+                <tr>
+                  <th>客户</th>
+                  <th>出库笔数</th>
+                  <th>总数量</th>
+                  <th>总销售额(KIP)</th>
+                  <th>最后拿货日期</th>
+                </tr>
+              </thead>
+              <tbody id="customerStats-tbody"></tbody>
+            </table>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 系统设置 -->
+      <section id="panel-settings" class="panel">
+        <div class="page section-module page-settings">
+          <header class="section-header page-header">
+            <h2 class="page-title">系统设置</h2>
+            <p class="page-desc">分类管理、报警阈值与数据导入导出</p>
+          </header>
+          <div class="section-body">
+          <div class="settings-section content-card card">
+            <h3 class="settings-block-title">分类管理</h3>
+            <p class="settings-block-desc">车型、主件、子件类别，用于入库与筛选</p>
+            <div class="settings-collapse-list">
+              <div class="card collapsible open" data-collapse="models">
+                <button type="button" class="collapsible-head">
+                  <span>车型</span>
+                  <span class="collapsible-arrow"></span>
+                </button>
+                <div class="collapsible-body">
+                  <ul id="list-models" class="cat-list"></ul>
+                  <div class="inline-form">
+                    <input type="text" id="new-model" placeholder="新增车型名称" class="settings-input">
+                    <button type="button" id="add-model" class="btn btn-secondary">添加</button>
+                  </div>
+                </div>
+              </div>
+              <div class="card collapsible open" data-collapse="mainTypes">
+                <button type="button" class="collapsible-head">
+                  <span>主件类别</span>
+                  <span class="collapsible-arrow"></span>
+                </button>
+                <div class="collapsible-body">
+                  <ul id="list-mainTypes" class="cat-list"></ul>
+                  <div class="inline-form">
+                    <input type="text" id="new-mainType" placeholder="新增主件类别" class="settings-input">
+                    <button type="button" id="add-mainType" class="btn btn-secondary">添加</button>
+                  </div>
+                </div>
+              </div>
+              <div class="card collapsible open" data-collapse="subTypes">
+                <button type="button" class="collapsible-head">
+                  <span>子件类别</span>
+                  <span class="collapsible-arrow"></span>
+                </button>
+                <div class="collapsible-body">
+                  <div class="form-field" style="margin-bottom: 12px;">
+                    <label for="sub-parent">归属主件</label>
+                    <select id="sub-parent"></select>
+                  </div>
+                  <ul id="list-subTypes" class="cat-list"></ul>
+                  <div class="inline-form">
+                    <input type="text" id="new-subType" placeholder="新增子件名称" class="settings-input">
+                    <button type="button" id="add-subType" class="btn btn-secondary">添加</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section content-card card">
+            <h3 class="settings-block-title">报警设置</h3>
+            <p class="settings-block-desc">库存低于阈值时在列表中高亮提示</p>
+            <div class="settings-row">
+              <label for="low-stock-threshold" class="settings-label">低于</label>
+              <input type="number" id="low-stock-threshold" min="0" value="5" class="settings-input-num">
+              <span class="settings-label">件时提示</span>
+              <button type="button" id="save-threshold" class="btn btn-primary">保存</button>
+            </div>
+          </div>
+
+          <div class="settings-section content-card card">
+            <h3 class="settings-block-title">数据管理</h3>
+            <p class="settings-block-desc">导出备份或从 JSON 文件导入数据</p>
+            <div class="settings-row">
+              <button type="button" id="btn-export" class="btn btn-primary">导出 JSON</button>
+              <label class="btn btn-outline file-label">导入 JSON <input type="file" id="file-import" accept=".json" hidden></label>
+              <span class="settings-hint" id="settings-hint"></span>
+            </div>
+          </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite">
+    <span id="toast-text"></span>
+  </div>
+  <div id="print-outbound-area" style="position:fixed;left:-9999px;top:0;width:800px;"></div>
+  <script src="app.js"></script>
+</body>
+</html>
