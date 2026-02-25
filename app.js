@@ -1,7 +1,13 @@
 (function () {
   'use strict';
 
-  // ========== 工具函数（弹窗、提示、格式化、安全输出） ==========
+  /* =======================================================================
+   * 阿伟汽配 - 出入库管理（本地存储 + JSON 导入导出）
+   * 结构：1 工具 2 存储与状态 3 领域逻辑 4 面板渲染 5 事件绑定
+   * 不改变 localStorage 键名与 JSON 数据结构
+   * ======================================================================= */
+
+  // ========== 1. 工具函数（弹窗、提示、格式化、安全输出） ==========
   function on(el, ev, fn) {
     if (el) el.addEventListener(ev, fn);
   }
@@ -36,7 +42,7 @@
     document.body.classList.toggle('sidebar-open');
   }
 
-  // ========== 状态与存储（localStorage 键、默认分类、state） ==========
+  // ========== 2. 存储与状态（localStorage 键、默认分类、state） ==========
   const STORAGE_KEYS = {
     parts: 'aw_part_stock_parts',
     products: 'aw_products',
@@ -50,6 +56,22 @@
     customers: 'aw_part_customers',
   };
   const QUALITY_GRADES = ['正常', '好', '差'];
+  /** 数量单位：仅用于数量，与货币 KIP 分离；老数据缺省为 个 */
+  const UNIT_OPTIONS = ['个', '件', '套', '只', '台', '支', '箱', '条'];
+  const DEFAULT_UNIT = '个';
+
+  function normalizeUnit(u) {
+    if (u == null || typeof u !== 'string') return DEFAULT_UNIT;
+    var s = String(u).trim();
+    return UNIT_OPTIONS.indexOf(s) >= 0 ? s : DEFAULT_UNIT;
+  }
+
+  /** 数量+单位展示，如 "36 个" */
+  function formatQtyWithUnit(qty, unit) {
+    var n = qty != null ? Number(qty) : 0;
+    var u = normalizeUnit(unit);
+    return (isNaN(n) ? 0 : n) + ' ' + u;
+  }
 
   const DEFAULT_MODELS = [
     { id: 'm1', name: 'Toyota Hilux Vigo' },
@@ -147,6 +169,9 @@
     if (savedSettings) {
       state.settings = { ...state.settings, ...savedSettings };
     }
+    state.products.forEach(function (p) { p.unit = normalizeUnit(p.unit); });
+    recalcBatchQuantitiesFromTransactions();
+    persistState(true);
   }
 
   function migratePartsToProductsBatches() {
@@ -162,7 +187,7 @@
         modelId: part.modelId || '',
         mainTypeId: part.mainTypeId || '',
         subTypeId: part.subTypeId || '',
-        unit: part.unit || 'KIP',
+        unit: normalizeUnit(part.unit),
         imageUrl: part.imageUrl,
         createdAt: part.createdAt || now(),
         updatedAt: part.updatedAt || now(),
@@ -236,8 +261,8 @@
     return s ? s.name : '-';
   }
 
-  // ========== 业务工具（金额格式化、产品/批次查询、分类名） ==========
-  /** 价格统一以 KIP 三位小数显示，如 100.000 */
+  // ========== 3. 领域逻辑（产品/批次/流水、分类名、金额与单位格式化） ==========
+  /** 价格：存为纯数字，展示时三位小数；货币单位 KIP 仅在界面文案中显示 */
   function formatKip(num) {
     if (num == null || num === '' || (typeof num === 'number' && isNaN(num))) return '';
     var n = Number(num);
@@ -287,7 +312,7 @@
       modelId: record.modelId || '',
       mainTypeId: record.mainTypeId || '',
       subTypeId: record.subTypeId || '',
-      unit: (record.unit || 'KIP').trim() || 'KIP',
+      unit: normalizeUnit(record.unit),
       salePrice: record.salePrice != null && record.salePrice !== '' ? parseFloat(record.salePrice) : undefined,
       imageUrl: (record.imageUrl != null && String(record.imageUrl).trim()) ? String(record.imageUrl).trim() : undefined,
       createdAt: time,
@@ -322,6 +347,7 @@
       partCode: product.code,
       type: 'in',
       quantity: qty,
+      unit: product.unit || DEFAULT_UNIT,
       supplierOrCustomer: record.supplier || '',
       operator: record.operator || state.settings.defaultOperator,
       time: time,
@@ -340,6 +366,7 @@
     batch.updatedAt = now();
     var costAtOut = batch.costPrice != null ? batch.costPrice : 0;
     var saleAtOut = product && product.salePrice != null ? product.salePrice : batch.salePrice;
+    var unitOut = (product && product.unit) ? product.unit : DEFAULT_UNIT;
     state.transactions.push({
       id: id(),
       batchId: batch.id,
@@ -347,6 +374,7 @@
       partCode: batch.partCode,
       type: 'out',
       quantity: qty,
+      unit: unitOut,
       costPrice: costAtOut,
       salePrice: saleAtOut,
       supplierOrCustomer: customer || '',
@@ -381,6 +409,7 @@
       remain -= deduct;
       var costAtOut = batch.costPrice != null ? batch.costPrice : 0;
       var saleAtOut = product.salePrice != null ? product.salePrice : batch.salePrice;
+      var unitOut = (product && product.unit) ? product.unit : DEFAULT_UNIT;
       state.transactions.push({
         id: id(),
         batchId: batch.id,
@@ -388,6 +417,7 @@
         partCode: product.code || batch.partCode,
         type: 'out',
         quantity: deduct,
+        unit: unitOut,
         costPrice: costAtOut,
         salePrice: saleAtOut,
         supplierOrCustomer: customer || '',
@@ -401,6 +431,22 @@
     return true;
   }
 
+  /** 根据流水重算各批次当前数量（入库-出库），保证与流水一致 */
+  function recalcBatchQuantitiesFromTransactions() {
+    var byBatch = {};
+    state.transactions.forEach(function (t) {
+      var bid = t.batchId;
+      if (!bid) return;
+      if (!byBatch[bid]) byBatch[bid] = { in: 0, out: 0 };
+      if (t.type === 'in') byBatch[bid].in += (t.quantity || 0);
+      else if (t.type === 'out') byBatch[bid].out += (t.quantity || 0);
+    });
+    state.batches.forEach(function (b) {
+      var q = byBatch[b.id];
+      b.quantity = q ? Math.max(0, q.in - q.out) : (b.quantity || 0);
+    });
+  }
+
   function fillSelect(sel, options, valueKey, labelKey) {
     if (!sel) return;
     const val = sel.value;
@@ -409,6 +455,7 @@
     if (val && options.some((o) => String(o[valueKey] ?? '') === val)) sel.value = val;
   }
 
+  // ========== 4. 面板切换与各模块渲染（dashboard / stock / records / contacts / profit） ==========
   function showPanel(panelId) {
     document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
     document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.remove('active'); });
@@ -471,7 +518,7 @@
       cardsEl.innerHTML =
         '<div class="dashboard-card"><span class="dashboard-card-label">总 SKU</span><div class="dashboard-card-value">' + totalSku + '</div></div>' +
         '<div class="dashboard-card"><span class="dashboard-card-label">总库存数量</span><div class="dashboard-card-value">' + totalQty.toLocaleString() + '</div></div>' +
-        '<div class="dashboard-card amount"><span class="dashboard-card-label">库存总金额(KIP)</span><div class="dashboard-card-value">' + (totalAmount ? formatKip(totalAmount) : '0.000') + '</div></div>' +
+        '<div class="dashboard-card amount"><span class="dashboard-card-label">库存总金额（KIP）</span><div class="dashboard-card-value">' + (totalAmount ? formatKip(totalAmount) : '0.000') + '</div></div>' +
         '<div class="dashboard-card danger"><span class="dashboard-card-label">低库存数量</span><div class="dashboard-card-value">' + lowCount + '</div></div>';
     }
     var thresholdEl = document.getElementById('dashboard-threshold-value');
@@ -481,8 +528,9 @@
     var lowTbody = document.getElementById('dashboard-low-tbody');
     if (lowTbody) {
       lowTbody.innerHTML = lowList.map(function (b) {
+        var p = getProductById(b.productId);
         var status = (b.quantity || 0) === 0 ? '缺货' : '低库存';
-        return '<tr class="row-low"><td>' + (b.partCode || '-') + '</td><td>' + escapeHtml(b.partName || '-') + (b.supplier ? ' · ' + escapeHtml(b.supplier) : '') + '</td><td class="cell-num-danger">' + (b.quantity ?? 0) + '</td><td>' + status + '</td></tr>';
+        return '<tr class="row-low"><td>' + (b.partCode || '-') + '</td><td>' + escapeHtml(b.partName || '-') + (b.supplier ? ' · ' + escapeHtml(b.supplier) : '') + '</td><td class="cell-num-danger">' + formatQtyWithUnit(b.quantity ?? 0, p && p.unit) + '</td><td>' + status + '</td></tr>';
       }).join('');
     }
     var lowMore = document.getElementById('dashboard-low-more');
@@ -494,7 +542,8 @@
         var name = getPartName(t.productId || t.batchId);
         var customer = (t.supplierOrCustomer || '').trim();
         if (!customer) customer = '未填客户';
-        return '<tr><td>' + formatTimeShort(t.time) + '</td><td>' + (t.partCode || '') + ' ' + escapeHtml(name) + '</td><td>' + (t.quantity ?? 0) + '</td><td>' + escapeHtml(customer) + '</td></tr>';
+        var u = t.unit ? normalizeUnit(t.unit) : (getProductById(t.productId) && getProductById(t.productId).unit) ? normalizeUnit(getProductById(t.productId).unit) : DEFAULT_UNIT;
+        return '<tr><td>' + formatTimeShort(t.time) + '</td><td>' + (t.partCode || '') + ' ' + escapeHtml(name) + '</td><td>' + formatQtyWithUnit(t.quantity ?? 0, u) + '</td><td>' + escapeHtml(customer) + '</td></tr>';
       }).join('');
     }
   }
@@ -574,9 +623,9 @@
     var cardsEl = document.getElementById('profit-cards');
     if (cardsEl) {
       cardsEl.innerHTML =
-        '<div class="dashboard-card"><span class="dashboard-card-label">销售额(KIP)</span><div class="dashboard-card-value amount">' + formatKip(stats.sales) + '</div></div>' +
-        '<div class="dashboard-card"><span class="dashboard-card-label">总成本(KIP)</span><div class="dashboard-card-value">' + formatKip(stats.cost) + '</div></div>' +
-        '<div class="dashboard-card"><span class="dashboard-card-label">毛利润(KIP)</span><div class="dashboard-card-value ' + (stats.profit >= 0 ? 'amount' : 'danger') + '">' + formatKip(stats.profit) + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">销售额（KIP）</span><div class="dashboard-card-value amount">' + formatKip(stats.sales) + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">总成本（KIP）</span><div class="dashboard-card-value">' + formatKip(stats.cost) + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">毛利润（KIP）</span><div class="dashboard-card-value ' + (stats.profit >= 0 ? 'amount' : 'danger') + '">' + formatKip(stats.profit) + '</div></div>' +
         '<div class="dashboard-card"><span class="dashboard-card-label">出库笔数</span><div class="dashboard-card-value">' + stats.count.toLocaleString() + '</div></div>' +
         '<div class="dashboard-card"><span class="dashboard-card-label">出库总数量</span><div class="dashboard-card-value">' + stats.qty.toLocaleString() + '</div></div>';
     }
@@ -724,6 +773,7 @@
     document.getElementById('in-salePrice').value = '';
     var inQuality = document.getElementById('in-quality');
     if (inQuality) inQuality.value = '正常';
+    setInUnitFromProduct();
   }
 
   document.querySelectorAll('input[name="in-mode"]').forEach(function (radio) {
@@ -770,10 +820,23 @@
     var summary = document.getElementById('in-part-summary');
     var batchCount = state.batches.filter(function (b) { return b.productId === product.id; }).length;
     summary.innerHTML = '已选：<strong>' + escapeHtml(product.code || '') + ' ' + escapeHtml(product.name || '') + '</strong>' + (batchCount ? ' · 已有 ' + batchCount + ' 个批次' : '');
-    document.getElementById('in-salePrice').value = formatKip(product.salePrice);
+    document.getElementById('in-salePrice').value = product.salePrice != null && product.salePrice !== '' ? product.salePrice : '';
+    setInUnitFromProduct();
     var qtyEl = document.getElementById('in-qty');
     if (qtyEl) qtyEl.focus();
   });
+
+  /** 入库单位下拉：与库存管理对接，现有配件时同步为产品单位，新建时默认 个 */
+  function setInUnitFromProduct() {
+    var sel = document.getElementById('in-unit');
+    if (!sel || sel.tagName !== 'SELECT') return;
+    var mode = getInboundMode();
+    if (mode === 'existing' && selectedInPart) {
+      sel.value = normalizeUnit(selectedInPart.unit);
+    } else {
+      sel.value = DEFAULT_UNIT;
+    }
+  }
 
   document.addEventListener('click', function (e) {
     if (!e.target.closest('.in-part-search-wrap')) document.getElementById('in-part-dropdown').style.display = 'none';
@@ -880,13 +943,20 @@
         mainTypeId: selectedInPart.mainTypeId || '',
         subTypeId: selectedInPart.subTypeId || '',
         quantity: qty,
-        unit: 'KIP',
+        unit: normalizeUnit(document.getElementById('in-unit') && document.getElementById('in-unit').value),
         supplier: supplier,
         qualityGrade: qualityGrade,
         costPrice: costPrice,
         salePrice: salePrice || undefined,
         operator: operator,
       });
+      var newUnit = normalizeUnit(document.getElementById('in-unit') && document.getElementById('in-unit').value);
+      if (selectedInPart && selectedInPart.unit !== newUnit) {
+        selectedInPart.unit = newUnit;
+        selectedInPart.updatedAt = now();
+        bumpDataVersion();
+        persistState();
+      }
       this.reset();
       document.getElementById('in-operator').value = state.settings.defaultOperator;
       document.getElementById('in-quality').value = '正常';
@@ -908,6 +978,7 @@
     var existing = productByCode(code);
     if (existing) {
       if (!confirm('该编码已存在（' + (existing.name || '') + '），是否改为现有产品入库？')) return;
+      var inUnitVal = normalizeUnit(document.getElementById('in-unit') && document.getElementById('in-unit').value);
       addBatch({
         code: existing.code,
         name: existing.name,
@@ -916,13 +987,19 @@
         mainTypeId: existing.mainTypeId || '',
         subTypeId: existing.subTypeId || '',
         quantity: qty,
-        unit: 'KIP',
+        unit: inUnitVal,
         supplier: supplier,
         qualityGrade: qualityGrade,
         costPrice: costPrice,
         salePrice: salePrice || undefined,
         operator: operator,
       });
+      if (existing.unit !== inUnitVal) {
+        existing.unit = inUnitVal;
+        existing.updatedAt = now();
+        bumpDataVersion();
+        persistState();
+      }
     } else {
       if (!confirm('编码不存在，是否新建产品并入库？')) return;
       addBatch({
@@ -933,7 +1010,7 @@
         mainTypeId: (document.getElementById('in-mainType') && document.getElementById('in-mainType').value) || '',
         subTypeId: (document.getElementById('in-subType') && document.getElementById('in-subType').value) || '',
         quantity: qty,
-        unit: 'KIP',
+        unit: normalizeUnit(document.getElementById('in-unit') && document.getElementById('in-unit').value) || DEFAULT_UNIT,
         supplier: supplier,
         qualityGrade: qualityGrade,
         costPrice: costPrice,
@@ -1008,6 +1085,8 @@
 
   function updateOutStockDisplay() {
     var productId = (document.getElementById('out-part') && document.getElementById('out-part').value);
+    var product = productId ? getProductById(productId) : null;
+    var unit = product ? normalizeUnit(product.unit) : DEFAULT_UNIT;
     var totalQty = productId ? getProductTotalQty(productId) : 0;
     var threshold = state.settings.lowStockThreshold || 5;
     var currentEl = document.getElementById('out-stock-current');
@@ -1015,18 +1094,21 @@
     var statusEl = document.getElementById('out-stock-status');
     var cardEl = document.getElementById('out-stock-card');
     var warnEl = document.getElementById('out-insufficient-warn');
+    var outUnitSel = document.getElementById('out-unit');
 
     if (!productId) {
       if (currentEl) currentEl.textContent = '—';
-      if (thresholdEl) thresholdEl.textContent = '最低警戒：— 件';
+      if (thresholdEl) thresholdEl.textContent = '最低警戒：—';
       if (statusEl) statusEl.textContent = '—';
+      if (outUnitSel) { outUnitSel.value = DEFAULT_UNIT; outUnitSel.disabled = true; }
       if (cardEl) cardEl.classList.remove('out-stock-status-normal', 'out-stock-status-low');
       if (warnEl) { warnEl.style.display = 'none'; warnEl.textContent = ''; }
       updateOutPreview();
       return;
     }
-    if (currentEl) currentEl.textContent = totalQty + ' 件';
-    if (thresholdEl) thresholdEl.textContent = '最低警戒：' + threshold + ' 件 · 按先进先出';
+    if (outUnitSel) { outUnitSel.value = unit; outUnitSel.disabled = true; }
+    if (currentEl) currentEl.textContent = formatQtyWithUnit(totalQty, unit);
+    if (thresholdEl) thresholdEl.textContent = '最低警戒：' + threshold + ' ' + unit + ' · 按先进先出';
     if (statusEl) {
       if (totalQty === 0) statusEl.textContent = '缺货';
       else if (totalQty < threshold) statusEl.textContent = '低库存';
@@ -1041,7 +1123,7 @@
       var qty = parseInt((document.getElementById('out-qty') && document.getElementById('out-qty').value), 10) || 0;
       if (qty > totalQty) {
         warnEl.style.display = 'block';
-        warnEl.textContent = '库存不足！当前共 ' + totalQty + ' 件，请减少出库数量。';
+        warnEl.textContent = '库存不足！当前共 ' + formatQtyWithUnit(totalQty, unit) + '，请减少出库数量。';
       } else {
         warnEl.style.display = 'none';
         warnEl.textContent = '';
@@ -1396,6 +1478,7 @@
         if (key === 'salePrice') { va = pa.salePrice != null ? pa.salePrice : -1; vb = pb.salePrice != null ? pb.salePrice : -1; return dir * (va - vb); }
         if (key === 'code') { va = ba.partCode; vb = bb.partCode; return dir * (String(va || '').localeCompare(String(vb || ''))); }
         if (key === 'name') { va = ba.partName; vb = bb.partName; return dir * (String(va || '').localeCompare(String(vb || ''))); }
+        if (key === 'unit') { va = pa.unit || ''; vb = pb.unit || ''; return dir * (String(va).localeCompare(String(vb))); }
         if (key === 'brand') { va = pa.brand; vb = pb.brand; return dir * (String(va || '').localeCompare(String(vb || ''))); }
         if (key === 'quantity') { va = ba.quantity || 0; vb = bb.quantity || 0; return dir * (va - vb); }
         return 0;
@@ -1427,10 +1510,8 @@
         var status = getStockStatus(b, threshold);
         var cost = b.costPrice != null ? Number(b.costPrice) : null;
         var sale = (p.salePrice != null ? p.salePrice : b.salePrice) != null ? Number(p.salePrice != null ? p.salePrice : b.salePrice) : null;
-        var stockVal = (b.quantity || 0) * (cost || 0);
         var costStr = cost != null ? formatKip(cost) : '-';
         var saleStr = sale != null ? formatKip(sale) : '-';
-        var stockValStr = stockVal ? formatKip(stockVal) : '-';
         var wrapClass = 'dropdown-wrap' + (isLastRow ? ' dropdown-up' : '');
         var opCell =
           '<span class="stock-op-cell">' +
@@ -1442,15 +1523,17 @@
           '<button type="button" class="dropdown-item btn-stock-delete" data-id="' + b.id + '">删除</button>' +
           '<button type="button" class="dropdown-item btn-stock-log" data-id="' + b.id + '">查看流水</button>' +
           '</div></div></span>';
+        var unitText = normalizeUnit(p.unit);
+        var qtyNum = b.quantity != null ? Number(b.quantity) : 0;
         return (
           '<tr class="' + status.rowClass + '">' +
           '<td>' + (b.partCode || '-') + '</td>' +
-          '<td>' + escapeHtml(b.partName || '-') + '</td>' +
           '<td>' + (p.brand || '-') + '</td>' +
-          '<td class="' + (status.qtyClass || '') + '">' + (b.quantity ?? 0) + '</td>' +
+          '<td>' + escapeHtml(b.partName || '-') + '</td>' +
+          '<td class="' + (status.qtyClass || '') + '">' + (isNaN(qtyNum) ? 0 : qtyNum) + '</td>' +
+          '<td>' + escapeHtml(unitText) + '</td>' +
           '<td>' + costStr + '</td>' +
           '<td>' + saleStr + '</td>' +
-          '<td class="cell-amount">' + stockValStr + '</td>' +
           '<td><span class="tag tag-' + (status.rowClass === 'row-high' ? 'success' : status.rowClass === 'row-low' || status.rowClass === 'row-out' ? 'danger' : 'normal') + '">' + status.text + '</span></td>' +
           '<td>' + opCell + '</td>' +
           '</tr>'
@@ -1476,9 +1559,11 @@
     var product = getProductById(batch.productId);
     var txList = state.transactions.filter(function (t) { return t.batchId === batchId || t.partId === batch.productId; }).sort(function (a, b) { return (b.time || '').localeCompare(a.time || ''); });
     document.getElementById('stock-log-title').textContent = '库存流水：' + (batch.partCode || '') + ' ' + (batch.partName || '') + (batch.supplier ? ' · ' + batch.supplier : '');
-    document.getElementById('stock-log-summary').innerHTML = '当前库存 <strong>' + (batch.quantity ?? 0) + '</strong> 件，共 <strong>' + txList.length + '</strong> 条记录';
+    var unitLabel = normalizeUnit(product && product.unit);
+    document.getElementById('stock-log-summary').innerHTML = '当前库存 <strong>' + formatQtyWithUnit(batch.quantity ?? 0, unitLabel) + '</strong>，共 <strong>' + txList.length + '</strong> 条记录';
     document.getElementById('stock-log-tbody').innerHTML = txList.slice(0, 50).map(function (t) {
-      return '<tr><td>' + (t.time ? new Date(t.time).toLocaleString('zh-CN') : '-') + '</td><td>' + (t.type === 'in' ? '入库' : '出库') + '</td><td>' + (t.quantity ?? 0) + '</td><td>' + escapeHtml(t.supplierOrCustomer || '-') + '</td><td>' + escapeHtml(t.operator || '-') + '</td></tr>';
+      var qty = formatQtyWithUnit(t.quantity ?? 0, t.unit || unitLabel);
+      return '<tr><td>' + (t.time ? new Date(t.time).toLocaleString('zh-CN') : '-') + '</td><td>' + (t.type === 'in' ? '入库' : '出库') + '</td><td>' + qty + '</td><td>' + escapeHtml(t.supplierOrCustomer || '-') + '</td><td>' + escapeHtml(t.operator || '-') + '</td></tr>';
     }).join('');
     openModal(document.getElementById('stock-log-modal'));
   }
@@ -1563,10 +1648,10 @@
       '<dt>质量</dt><dd>' + (batch.qualityGrade || '-') + '</dd>' +
       '<dt>车型</dt><dd>' + getModelName(p.modelId) + '</dd>' +
       '<dt>主件 / 子件</dt><dd>' + getMainTypeName(p.mainTypeId) + ' / ' + getSubTypeName(p.subTypeId) + '</dd>' +
-      '<dt>单位</dt><dd>' + (p.unit || 'KIP') + '</dd>' +
-      '<dt>成本价(KIP)</dt><dd>' + (cost != null ? formatKip(cost) : '-') + '</dd>' +
-      '<dt>参考售价(KIP)</dt><dd>' + (sale != null ? formatKip(sale) : '-') + '</dd>' +
-      '<dt>库存金额(KIP)</dt><dd>' + (stockValue ? formatKip(stockValue) : '-') + '</dd>' +
+      '<dt>单位</dt><dd>' + escapeHtml(normalizeUnit(p.unit)) + '</dd>' +
+      '<dt>成本价（KIP）</dt><dd>' + (cost != null ? formatKip(cost) : '-') + '</dd>' +
+      '<dt>参考售价（KIP）</dt><dd>' + (sale != null ? formatKip(sale) : '-') + '</dd>' +
+      '<dt>库存金额（KIP）</dt><dd>' + (stockValue ? formatKip(stockValue) : '-') + '</dd>' +
       '<dt>最后更新</dt><dd>' + (batch.updatedAt ? new Date(batch.updatedAt).toLocaleString('zh-CN') : '-') + '</dd>';
     var modal = document.getElementById('stock-detail-modal');
     if (modal) modal.setAttribute('data-batch-id', String(batchId));
@@ -1631,12 +1716,17 @@
     document.getElementById('stock-edit-code').value = batch.partCode || '';
     document.getElementById('stock-edit-name').value = p.name || batch.partName || '';
     document.getElementById('stock-edit-brand').value = p.brand || '';
-    document.getElementById('stock-edit-unit').value = p.unit || 'KIP';
-    document.getElementById('stock-edit-costPrice').value = formatKip(batch.costPrice);
-    document.getElementById('stock-edit-salePrice').value = formatKip(p.salePrice);
+    var unitSel = document.getElementById('stock-edit-unit');
+    if (unitSel && unitSel.tagName === 'SELECT') {
+      fillSelect(unitSel, UNIT_OPTIONS.map(function (u) { return { id: u, name: u }; }), 'id', 'name');
+      unitSel.value = normalizeUnit(p.unit);
+    } else if (unitSel) unitSel.value = normalizeUnit(p.unit);
+    document.getElementById('stock-edit-costPrice').value = batch.costPrice != null && batch.costPrice !== '' ? batch.costPrice : '';
+    document.getElementById('stock-edit-salePrice').value = p.salePrice != null && p.salePrice !== '' ? p.salePrice : '';
     document.getElementById('stock-edit-supplier').value = batch.supplier || '';
     document.getElementById('stock-edit-quality').value = batch.qualityGrade || '';
-    document.getElementById('stock-edit-qty').value = batch.quantity ?? '';
+    var qtyEl = document.getElementById('stock-edit-qty');
+    if (qtyEl) { qtyEl.value = batch.quantity ?? ''; qtyEl.readOnly = true; qtyEl.title = '由入库/出库自动计算'; }
     fillStockEditSelects(p);
     var preview = document.getElementById('stock-edit-imagePreview');
     if (preview) {
@@ -1672,7 +1762,7 @@
     if (product) {
       product.name = document.getElementById('stock-edit-name').value.trim();
       product.brand = document.getElementById('stock-edit-brand').value.trim();
-      product.unit = (document.getElementById('stock-edit-unit').value || 'KIP').trim();
+      product.unit = normalizeUnit(document.getElementById('stock-edit-unit').value);
       var saleVal = document.getElementById('stock-edit-salePrice').value;
       product.salePrice = saleVal === '' ? undefined : Number(saleVal);
       product.modelId = document.getElementById('stock-edit-model').value || undefined;
@@ -1686,8 +1776,7 @@
     batch.costPrice = costVal === '' ? undefined : Number(costVal);
     batch.supplier = document.getElementById('stock-edit-supplier').value.trim() || undefined;
     batch.qualityGrade = document.getElementById('stock-edit-quality').value.trim() || undefined;
-    var qtyVal = document.getElementById('stock-edit-qty').value;
-    batch.quantity = qtyVal === '' ? 0 : Math.max(0, parseInt(qtyVal, 10));
+    /* 库存数量由流水自动计算，不在此编辑 */
     batch.updatedAt = now();
     bumpDataVersion();
     persistState();
@@ -1817,10 +1906,9 @@
         supplier: b.supplier,
         qualityGrade: b.qualityGrade,
         quantity: b.quantity,
-        unit: p.unit || 'KIP',
+        unit: normalizeUnit(p.unit),
         costPrice: b.costPrice,
         salePrice: p.salePrice != null ? p.salePrice : b.salePrice,
-        stockValue: (b.quantity || 0) * (b.costPrice || 0),
         updatedAt: b.updatedAt,
       };
     });
@@ -1834,26 +1922,24 @@
 
   function exportStockListCsv() {
     var list = getFilteredStockList();
-    var headers = ['编码', '名称', '品牌', '车型', '主件', '子件', '厂家', '质量', '库存数量', '单位', '成本价', '销售价', '库存金额', '最后更新'];
+    var headers = ['编码', '品牌', '名称', '库存', '单位', '成本价', '销售价', '车型', '主件', '子件', '厂家', '质量', '最后更新'];
     var rows = list.map(function (row) {
       var b = row.batch;
       var p = row.product;
-      var stockValue = (b.quantity || 0) * (b.costPrice || 0);
       var sale = p.salePrice != null ? p.salePrice : b.salePrice;
       return [
         b.partCode || '',
-        b.partName || '',
         p.brand || '',
+        b.partName || '',
+        b.quantity ?? '',
+        normalizeUnit(p.unit),
+        formatKip(b.costPrice) || '',
+        formatKip(sale) || '',
         getModelName(p.modelId),
         getMainTypeName(p.mainTypeId),
         getSubTypeName(p.subTypeId),
         b.supplier || '',
         b.qualityGrade || '',
-        b.quantity ?? '',
-        p.unit || 'KIP',
-        formatKip(b.costPrice) || '',
-        formatKip(sale) || '',
-        formatKip(stockValue) || '',
         b.updatedAt ? new Date(b.updatedAt).toLocaleString('zh-CN') : '',
       ];
     });
@@ -1934,13 +2020,16 @@
       .map(function (t) {
         var partName = getPartName(t.productId || t.partId);
         if (partName === '-' && !t.partCode) return '';
+        var product = getProductById(t.productId || t.partId);
+        var unitLabel = t.unit ? normalizeUnit(t.unit) : (product ? normalizeUnit(product.unit) : DEFAULT_UNIT);
+        var qtyStr = formatQtyWithUnit(t.quantity ?? 0, unitLabel);
         var rowClass = t.type === 'in' ? 'record-row-in' : 'record-row-out';
         return (
           '<tr class="record-row ' + rowClass + '" data-tx-id="' + (t.id || '') + '" role="button" tabindex="0" title="点击查看详情">' +
           '<td>' + (t.partCode || '-') + '</td>' +
           '<td>' + (partName || '-') + '</td>' +
           '<td>' + (t.type === 'in' ? '入库' : '出库') + '</td>' +
-          '<td>' + (t.quantity ?? 0) + '</td>' +
+          '<td>' + qtyStr + '</td>' +
           '<td>' + (t.supplierOrCustomer || '-') + '</td>' +
           '<td>' + (t.time ? new Date(t.time).toLocaleString('zh-CN') : '-') + '</td></tr>'
         );
@@ -1953,6 +2042,9 @@
     var t = state.transactions.find(function (x) { return x.id === txId; });
     if (!t) return;
     var partName = getPartName(t.productId || t.partId);
+    var product = getProductById(t.productId || t.partId);
+    var unitLabel = t.unit ? normalizeUnit(t.unit) : (product ? normalizeUnit(product.unit) : DEFAULT_UNIT);
+    var qtyStr = t.quantity != null ? formatQtyWithUnit(t.quantity, unitLabel) : '-';
     var body = document.getElementById('record-detail-body');
     if (!body) return;
     var salePriceStr = t.type === 'out' && t.salePrice != null ? (typeof formatKip === 'function' ? formatKip(t.salePrice) : t.salePrice) : '-';
@@ -1961,10 +2053,10 @@
       '<dt>类型</dt><dd>' + (t.type === 'in' ? '入库' : '出库') + '</dd>' +
       '<dt>配件编码</dt><dd>' + (t.partCode || '-') + '</dd>' +
       '<dt>配件名称</dt><dd>' + (partName || '-') + '</dd>' +
-      '<dt>数量</dt><dd>' + (t.quantity ?? '-') + '</dd>' +
+      '<dt>数量</dt><dd>' + qtyStr + '</dd>' +
       '<dt>供应商/客户</dt><dd>' + (t.supplierOrCustomer || '-') + '</dd>' +
       '<dt>操作人员</dt><dd>' + (t.operator || '-') + '</dd>' +
-      '<dt>销售价(出库)</dt><dd>' + salePriceStr + '</dd>';
+      '<dt>销售价（出库，KIP）</dt><dd>' + salePriceStr + '</dd>';
     var modal = document.getElementById('record-detail-modal');
     if (modal) openModal(modal);
   }
@@ -2100,7 +2192,7 @@
     html += '<tr><td style="padding:2px 12px 2px 0;">联系电话</td><td>' + escapeHtml(phone) + '</td></tr>';
     html += '</table>';
     html += '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%;">';
-    html += '<tr><th>编码</th><th>名称</th><th>数量</th><th>单价(KIP)</th><th>总价(KIP)</th></tr>';
+    html += '<tr><th>编码</th><th>名称</th><th>数量</th><th>单价（KIP）</th><th>总价（KIP）</th></tr>';
     rows.forEach(function (r) {
       html += '<tr><td>' + escapeHtml(r.code) + '</td><td>' + escapeHtml(r.name) + '</td><td>' + r.qty + '</td><td>' + formatKip(r.unitPrice) + '</td><td>' + formatKip(r.total) + '</td></tr>';
     });
@@ -2477,6 +2569,11 @@
             migratePartsToProductsBatches();
           }
         }
+        state.products.forEach(function (p) { p.unit = normalizeUnit(p.unit); });
+        state.transactions.forEach(function (t) {
+          if (!t.unit) { var p = getProductById(t.productId); t.unit = (p && p.unit) ? p.unit : DEFAULT_UNIT; }
+        });
+        recalcBatchQuantitiesFromTransactions();
         bumpDataVersion();
         persistState();
         fillInFormSelects();
