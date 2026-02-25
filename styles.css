@@ -1,15 +1,19 @@
-/* 阿伟汽配 - 商用内部系统：门店风格、轻米灰背景、分组清晰 */
+/* 阿伟汽配 - 商用内部系统：东南亚线下批发场景，简洁留白，无科技风 */
 :root {
-  /* 布局 */
+  /* 布局与间距 */
   --content-bg: #f5f2ed;
   --content-max: 1200px;
   --gap: 16px;
   --page-gap: 24px;
-  /* 卡片：米白底 + 10px 圆角，偏实体风格 */
+  /* 圆角统一 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  /* 卡片 */
   --card: #fdfcfa;
   --card-border: #e8e4dc;
-  --card-radius: 10px;
+  --card-radius: var(--radius-md);
   --card-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 4px 20px rgba(0, 0, 0, 0.12);
   /* 侧栏 */
   --sidebar-bg: #3d4f5c;
   --sidebar-text: #ecf0f1;
@@ -19,11 +23,11 @@
   /* 文字 */
   --text: #2c3e50;
   --text-muted: #6b7280;
-  /* 主色：偏中性，非科技蓝 */
+  /* 主色 */
   --accent: #4a5f6e;
   --accent-hover: #5a6f7e;
   --btn-height: 36px;
-  /* 状态与强调 */
+  /* 状态色 */
   --amount: #b45309;
   --danger: #c53030;
   --warn: #b45309;
@@ -300,6 +304,23 @@ body .filter-form select {
   box-shadow: var(--card-shadow);
 }
 
+/* 弹窗底部操作区：单行排列、右对齐，不挤在一起 */
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gap);
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--card-border);
+}
+.modal-actions-multi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+}
+
 .filter-form {
   display: flex;
   flex-wrap: wrap;
@@ -345,7 +366,7 @@ body .filter-form select {
   height: var(--btn-height);
   padding: 0 12px;
   border: 1px solid var(--card-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   min-width: 120px;
   box-sizing: border-box;
@@ -765,6 +786,35 @@ input.readonly {
   border-radius: 6px;
   font-size: 0.95rem;
   min-width: 160px;
+}
+
+.field-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.field-with-unit input {
+  flex: 1;
+  min-width: 80px;
+}
+.qty-unit {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.unit-select {
+  min-width: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--card);
+}
+.unit-select:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
 }
 
 /* ---------- 出库管理：左右结构 60/40 ---------- */
@@ -1262,8 +1312,20 @@ td.cell-amount { font-weight: 700; color: var(--amount); }
 }
 
 /* ---------- 表格 ---------- */
+.table-scroll-hint {
+  display: none;
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* 避免移动端误触选中文字 */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .data-table {
@@ -1811,12 +1873,6 @@ body.modal-open {
   font-size: 0.95rem;
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
 /* 详情弹窗键值列表 */
 .detail-dl {
   display: grid;
@@ -2230,25 +2286,63 @@ body.sidebar-open .sidebar-overlay {
     max-width: none;
     flex: 1 1 100%;
   }
+  /* 表格：小屏显示滑动提示，表设最小宽度保证可左右滑 */
+  .table-scroll-hint {
+    display: block;
+  }
   .table-wrap {
     -webkit-overflow-scrolling: touch;
     margin: 0 -16px;
     padding: 0 16px;
+    border-radius: var(--radius-sm);
   }
   .content-card .table-wrap {
     margin: 0 -20px;
     padding: 0 20px;
   }
+  /* 表格最小宽度，避免被压扁，强制出现横向滚动 */
+  .data-table { min-width: 560px; }
+  .data-table-stock { min-width: 720px; }
+  .data-table-records { min-width: 520px; }
+  /* 首列粘性：左右滑动时编码/名称始终可见 */
+  .data-table th:first-child,
+  .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--card);
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.06);
+  }
+  .data-table th:first-child {
+    background: var(--content-bg);
+  }
+  .data-table tbody tr.row-low td:first-child { background: #fef2f2; }
+  .data-table tbody tr.row-out td:first-child { background: #f1f5f9; }
+  .data-table tbody tr.row-high td:first-child { background: #f0fdf4; }
+  .data-table tbody tr.row-normal td:first-child { background: #fff; }
   .data-table th,
   .data-table td {
     padding: 8px 10px;
     font-size: 0.8125rem;
   }
+  /* 表单：输入框/下拉全宽，便于点击 */
+  .field input,
+  .field select,
+  .form-field .filter-input,
+  .form-field select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
   .modal-box {
     max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
     margin: 16px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .modal { padding: 12px; }
+  body.modal-open { overflow: hidden; }
   .btn {
     min-height: 44px;
     padding: 10px 16px;
