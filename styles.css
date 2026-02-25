@@ -90,13 +90,18 @@ body .filter-form select {
   color: var(--sidebar-text-muted);
 }
 
+/* 中间导航可纵向滚动，避免与底部「导入导出」重叠；微信内需触摸滚动 */
 .sidebar-nav {
   flex: 1;
   min-height: 0;
-  padding: 10px 0;
+  padding: 10px 0 12px;
   display: flex;
   flex-direction: column;
   gap: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .sidebar-group {
