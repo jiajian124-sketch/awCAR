@@ -1,8 +1,16 @@
 (function () {
   'use strict';
 
+  // ========== 工具函数（弹窗、提示、格式化、安全输出） ==========
   function on(el, ev, fn) {
     if (el) el.addEventListener(ev, fn);
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
   }
 
   function openModal(modalEl) {
@@ -28,6 +36,7 @@
     document.body.classList.toggle('sidebar-open');
   }
 
+  // ========== 状态与存储（localStorage 键、默认分类、state） ==========
   const STORAGE_KEYS = {
     parts: 'aw_part_stock_parts',
     products: 'aw_products',
@@ -114,7 +123,14 @@
     contactsPageSize: 10,
     contactsSortKey: 'createdAt',
     contactsSortDir: -1,
+    unsavedToJsonFile: false,
+    dataVersion: 0,
+    lastRenderedVersion: {},
   };
+
+  function bumpDataVersion() {
+    state.dataVersion = (state.dataVersion || 0) + 1;
+  }
 
   function loadState() {
     state.parts = load(STORAGE_KEYS.parts, []);
@@ -171,10 +187,10 @@
     state.transactions.forEach(function (tx) {
       if (tx.partId && partIdToBatchId[tx.partId]) tx.batchId = partIdToBatchId[tx.partId];
     });
-    persistState();
+    persistState(true);
   }
 
-  function persistState() {
+  function persistStateImmediate(skipUnsavedFlag) {
     save(STORAGE_KEYS.parts, state.parts);
     save(STORAGE_KEYS.products, state.products);
     save(STORAGE_KEYS.batches, state.batches);
@@ -185,6 +201,24 @@
     save(STORAGE_KEYS.suppliers, state.suppliers);
     save(STORAGE_KEYS.customers, state.customers);
     save(STORAGE_KEYS.settings, state.settings);
+    if (!skipUnsavedFlag) {
+      state.unsavedToJsonFile = true;
+      updateUnsavedBanner();
+    }
+  }
+
+  var persistStateTimer = null;
+  function persistState(skipUnsavedFlag) {
+    if (persistStateTimer) clearTimeout(persistStateTimer);
+    persistStateTimer = setTimeout(function () {
+      persistStateTimer = null;
+      persistStateImmediate(skipUnsavedFlag);
+    }, 600);
+  }
+
+  function updateUnsavedBanner() {
+    var el = document.getElementById('unsaved-banner');
+    if (el) el.style.display = state.unsavedToJsonFile ? 'block' : 'none';
   }
 
   function getModelName(id) {
@@ -202,6 +236,7 @@
     return s ? s.name : '-';
   }
 
+  // ========== 业务工具（金额格式化、产品/批次查询、分类名） ==========
   /** 价格统一以 KIP 三位小数显示，如 100.000 */
   function formatKip(num) {
     if (num == null || num === '' || (typeof num === 'number' && isNaN(num))) return '';
@@ -291,10 +326,11 @@
       operator: record.operator || state.settings.defaultOperator,
       time: time,
     });
+    bumpDataVersion();
     persistState();
   }
 
-  function outBatch(batchId, quantity, customer, operator) {
+  function outBatch(batchId, quantity, customer, operator, paymentStatus) {
     var batch = getBatchById(batchId);
     if (!batch) return false;
     var product = getProductById(batch.productId);
@@ -302,6 +338,8 @@
     if (qty <= 0 || (batch.quantity || 0) < qty) return false;
     batch.quantity = (batch.quantity || 0) - qty;
     batch.updatedAt = now();
+    var costAtOut = batch.costPrice != null ? batch.costPrice : 0;
+    var saleAtOut = product && product.salePrice != null ? product.salePrice : batch.salePrice;
     state.transactions.push({
       id: id(),
       batchId: batch.id,
@@ -309,17 +347,20 @@
       partCode: batch.partCode,
       type: 'out',
       quantity: qty,
-      salePrice: product && product.salePrice != null ? product.salePrice : batch.salePrice,
+      costPrice: costAtOut,
+      salePrice: saleAtOut,
       supplierOrCustomer: customer || '',
       operator: operator || state.settings.defaultOperator,
       time: batch.updatedAt,
+      paymentStatus: paymentStatus || 'booked',
     });
+    bumpDataVersion();
     persistState();
     return true;
   }
 
   /** 按产品 FIFO 出库：从最早批次开始扣减，可能产生多笔流水 */
-  function outByProductFIFO(productId, quantity, customer, operator) {
+  function outByProductFIFO(productId, quantity, customer, operator, paymentStatus) {
     var product = getProductById(productId);
     if (!product) return false;
     var need = Math.max(0, parseInt(quantity, 10) || 0);
@@ -338,6 +379,8 @@
       batch.quantity = (batch.quantity || 0) - deduct;
       batch.updatedAt = time;
       remain -= deduct;
+      var costAtOut = batch.costPrice != null ? batch.costPrice : 0;
+      var saleAtOut = product.salePrice != null ? product.salePrice : batch.salePrice;
       state.transactions.push({
         id: id(),
         batchId: batch.id,
@@ -345,12 +388,15 @@
         partCode: product.code || batch.partCode,
         type: 'out',
         quantity: deduct,
-        salePrice: product.salePrice != null ? product.salePrice : batch.salePrice,
+        costPrice: costAtOut,
+        salePrice: saleAtOut,
         supplierOrCustomer: customer || '',
         operator: operator || state.settings.defaultOperator,
         time: time,
+        paymentStatus: paymentStatus || 'booked',
       });
     }
+    bumpDataVersion();
     persistState();
     return true;
   }
@@ -364,20 +410,38 @@
   }
 
   function showPanel(panelId) {
-    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
-    const panel = document.getElementById('panel-' + panelId);
-    const navItem = document.querySelector('.nav-item[data-panel="' + panelId + '"]');
+    document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.remove('active'); });
+    var panel = document.getElementById('panel-' + panelId);
+    var navItem = document.querySelector('.nav-item[data-panel="' + panelId + '"]');
     if (panel) panel.classList.add('active');
     if (navItem) navItem.classList.add('active');
-    if (panelId === 'dashboard') renderDashboard();
-    if (panelId === 'contacts') renderContacts();
-    if (panelId === 'in') { fillInFormSelects(); fillSupplierSelect(); initInboundPanel(); }
-    if (panelId === 'out') { fillOutPartSelect(); fillCustomerSelect(); updateOutStockDisplay(); }
-    if (panelId === 'stock') { fillFilterSelects(); renderStock(); }
-    if (panelId === 'records') { fillRecordsFilters(); renderRecords(); updateRecordsStats(); }
-    if (panelId === 'customerStats') renderCustomerStats();
-    if (panelId === 'settings') renderSettings();
+    var v = state.dataVersion || 0;
+    var last = state.lastRenderedVersion || {};
+    requestAnimationFrame(function () {
+      if (panelId === 'dashboard') {
+        if (last.dashboard !== v) { renderDashboard(); state.lastRenderedVersion = state.lastRenderedVersion || {}; state.lastRenderedVersion.dashboard = v; }
+      } else if (panelId === 'contacts') {
+        if (last.contacts !== v) { renderContacts(); state.lastRenderedVersion = state.lastRenderedVersion || {}; state.lastRenderedVersion.contacts = v; }
+      } else if (panelId === 'in') { fillInFormSelects(); fillSupplierSelect(); initInboundPanel(); }
+      else if (panelId === 'out') { fillOutPartSelect(); fillCustomerSelect(); var qEl = document.getElementById('out-qty'); if (qEl) qEl.value = '1'; updateOutStockDisplay(); updateOutPreview(); }
+      else if (panelId === 'stock') {
+        fillFilterSelects();
+        if (last.stock !== v) { renderStock(); state.lastRenderedVersion = state.lastRenderedVersion || {}; state.lastRenderedVersion.stock = v; }
+      } else if (panelId === 'records') {
+        fillRecordsFilters();
+        if (last.records !== v) { renderRecords(); updateRecordsStats(); state.lastRenderedVersion = state.lastRenderedVersion || {}; state.lastRenderedVersion.records = v; }
+      } else if (panelId === 'customerStats') {
+        if (last.customerStats !== v) { renderCustomerStats(); state.lastRenderedVersion = state.lastRenderedVersion || {}; state.lastRenderedVersion.customerStats = v; }
+      } else if (panelId === 'profit') {
+        if (!getProfitDateRange()) {
+          var now = new Date();
+          var todayStr = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+          setProfitDateRange(now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-01', todayStr);
+        }
+        if (last.profit !== v) { renderProfit(); state.lastRenderedVersion = state.lastRenderedVersion || {}; state.lastRenderedVersion.profit = v; }
+      } else if (panelId === 'categories') renderSettings();
+    });
   }
 
   function formatTimeShort(iso) {
@@ -435,6 +499,124 @@
     }
   }
 
+  function getProfitDateRange() {
+    var fromEl = document.getElementById('profit-dateFrom');
+    var toEl = document.getElementById('profit-dateTo');
+    var from = (fromEl && fromEl.value) || '';
+    var to = (toEl && toEl.value) || '';
+    if (!from || !to) return null;
+    return { from: from, to: to };
+  }
+
+  function setProfitDateRange(from, to) {
+    var fromEl = document.getElementById('profit-dateFrom');
+    var toEl = document.getElementById('profit-dateTo');
+    if (fromEl) fromEl.value = from;
+    if (toEl) toEl.value = to;
+  }
+
+  function getProfitStats(dateFrom, dateTo) {
+    var outTxs = state.transactions.filter(function (t) { return t.type === 'out' && t.time; });
+    if (dateFrom) outTxs = outTxs.filter(function (t) { return (t.time || '').slice(0, 10) >= dateFrom; });
+    if (dateTo) outTxs = outTxs.filter(function (t) { return (t.time || '').slice(0, 10) <= dateTo; });
+    var sales = 0, cost = 0, qty = 0;
+    outTxs.forEach(function (t) {
+      var q = t.quantity || 0;
+      var sale = (t.salePrice != null ? t.salePrice : 0) * q;
+      var batch = getBatchById(t.batchId);
+      var costPer = t.costPrice != null ? t.costPrice : (batch && batch.costPrice != null ? batch.costPrice : 0);
+      sales += sale;
+      cost += costPer * q;
+      qty += q;
+    });
+    return { sales: sales, cost: cost, profit: sales - cost, qty: qty, count: outTxs.length };
+  }
+
+  function getProfitDailyBreakdown(dateFrom, dateTo) {
+    var outTxs = state.transactions.filter(function (t) { return t.type === 'out' && t.time; });
+    if (dateFrom) outTxs = outTxs.filter(function (t) { return (t.time || '').slice(0, 10) >= dateFrom; });
+    if (dateTo) outTxs = outTxs.filter(function (t) { return (t.time || '').slice(0, 10) <= dateTo; });
+    var byDay = {};
+    outTxs.forEach(function (t) {
+      var date = (t.time || '').slice(0, 10);
+      if (!byDay[date]) byDay[date] = { count: 0, qty: 0, sales: 0, cost: 0 };
+      var q = t.quantity || 0;
+      var sale = (t.salePrice != null ? t.salePrice : 0) * q;
+      var batch = getBatchById(t.batchId);
+      var costPer = t.costPrice != null ? t.costPrice : (batch && batch.costPrice != null ? batch.costPrice : 0);
+      byDay[date].count += 1;
+      byDay[date].qty += q;
+      byDay[date].sales += sale;
+      byDay[date].cost += costPer * q;
+    });
+    var rows = Object.keys(byDay).sort();
+    return rows.map(function (date) {
+      var o = byDay[date];
+      return { date: date, count: o.count, qty: o.qty, sales: o.sales, cost: o.cost, profit: o.sales - o.cost };
+    }).reverse();
+  }
+
+  function renderProfit() {
+    var range = getProfitDateRange();
+    var now = new Date();
+    var todayStr = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+    var monthStart = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-01';
+    if (!range) {
+      setProfitDateRange(monthStart, todayStr);
+      range = { from: monthStart, to: todayStr };
+    }
+    var stats = getProfitStats(range.from, range.to);
+    var daily = getProfitDailyBreakdown(range.from, range.to);
+
+    var hintEl = document.getElementById('profit-range-hint');
+    if (hintEl) hintEl.textContent = '统计范围：' + range.from + ' 至 ' + range.to + '，共 ' + stats.count + ' 笔出库';
+
+    var cardsEl = document.getElementById('profit-cards');
+    if (cardsEl) {
+      cardsEl.innerHTML =
+        '<div class="dashboard-card"><span class="dashboard-card-label">销售额(KIP)</span><div class="dashboard-card-value amount">' + formatKip(stats.sales) + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">总成本(KIP)</span><div class="dashboard-card-value">' + formatKip(stats.cost) + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">毛利润(KIP)</span><div class="dashboard-card-value ' + (stats.profit >= 0 ? 'amount' : 'danger') + '">' + formatKip(stats.profit) + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">出库笔数</span><div class="dashboard-card-value">' + stats.count.toLocaleString() + '</div></div>' +
+        '<div class="dashboard-card"><span class="dashboard-card-label">出库总数量</span><div class="dashboard-card-value">' + stats.qty.toLocaleString() + '</div></div>';
+    }
+
+    var tbody = document.getElementById('profit-daily-tbody');
+    if (tbody) {
+      if (daily.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6">该时间段内无出库记录</td></tr>';
+      } else {
+        tbody.innerHTML = daily.map(function (row) {
+          return '<tr><td>' + row.date + '</td><td>' + row.count + '</td><td>' + row.qty.toLocaleString() + '</td><td class="cell-amount">' + formatKip(row.sales) + '</td><td class="cell-amount">' + formatKip(row.cost) + '</td><td class="cell-amount ' + (row.profit >= 0 ? 'amount' : 'danger') + '">' + formatKip(row.profit) + '</td></tr>';
+        }).join('');
+      }
+    }
+  }
+
+  on(document.getElementById('profit-filter-form'), 'submit', function (e) {
+    e.preventDefault();
+    renderProfit();
+  });
+  document.querySelectorAll('.profit-quick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var now = new Date();
+      var y = now.getFullYear();
+      var m = ('0' + (now.getMonth() + 1)).slice(-2);
+      var d = ('0' + now.getDate()).slice(-2);
+      var today = y + '-' + m + '-' + d;
+      var day = now.getDay();
+      var weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+      var ws = weekStart.getFullYear() + '-' + ('0' + (weekStart.getMonth() + 1)).slice(-2) + '-' + ('0' + weekStart.getDate()).slice(-2);
+      var monthStart = y + '-' + m + '-01';
+      var range = this.getAttribute('data-range');
+      if (range === 'today') setProfitDateRange(today, today);
+      else if (range === 'week') setProfitDateRange(ws, today);
+      else if (range === 'month') setProfitDateRange(monthStart, today);
+      renderProfit();
+    });
+  });
+
   on(document.getElementById('sidebar-toggle'), 'click', function (e) {
     e.preventDefault();
     toggleSidebar();
@@ -450,15 +632,15 @@
     }
   });
 
-  document.querySelectorAll('.nav-item').forEach(function (el) {
-    el.addEventListener('click', function (e) {
-      e.preventDefault();
-      var panelId = this.getAttribute('data-panel');
-      if (panelId) {
-        showPanel(panelId);
-        closeSidebar();
-      }
-    });
+  on(document.querySelector('.sidebar-nav'), 'click', function (e) {
+    var item = e.target.closest('.nav-item');
+    if (!item) return;
+    e.preventDefault();
+    var panelId = item.getAttribute('data-panel');
+    if (panelId) {
+      showPanel(panelId);
+      closeSidebar();
+    }
   });
 
   document.querySelectorAll('.collapsible').forEach((card) => {
@@ -488,7 +670,19 @@
   function fillCustomerSelect() {
     const sel = document.getElementById('out-customer-select');
     if (!sel) return;
-    const opts = [{ id: '', name: '-- 选择或手动输入 --' }, ...state.customers.map((c) => ({ id: c.name, name: c.name }))];
+    var outTxs = state.transactions.filter(function (t) { return t.type === 'out' && (t.supplierOrCustomer || '').trim(); });
+    var lastByCustomer = {};
+    outTxs.forEach(function (t) {
+      var name = t.supplierOrCustomer.trim();
+      if (!lastByCustomer[name] || (t.time || '') > lastByCustomer[name]) lastByCustomer[name] = t.time || '';
+    });
+    var names = state.customers.map(function (c) { return c.name; });
+    var recent5 = Object.keys(lastByCustomer)
+      .sort(function (a, b) { return (lastByCustomer[b] || '').localeCompare(lastByCustomer[a] || ''); })
+      .slice(0, 5);
+    var rest = names.filter(function (n) { return recent5.indexOf(n) === -1; });
+    var ordered = recent5.concat(rest);
+    var opts = [{ id: '', name: '-- 选择或手动输入 --' }].concat(ordered.map(function (n) { return { id: n, name: n }; }));
     fillSelect(sel, opts, 'id', 'name');
   }
 
@@ -790,8 +984,18 @@
     updateOutStockDisplay();
   }
 
-  on(document.getElementById('out-search'), 'input', fillOutPartSelect);
-  on(document.getElementById('out-search'), 'change', fillOutPartSelect);
+  (function () {
+    var outSearchDebounce = null;
+    function debouncedFillOutPartSelect() {
+      if (outSearchDebounce) clearTimeout(outSearchDebounce);
+      outSearchDebounce = setTimeout(function () {
+        outSearchDebounce = null;
+        fillOutPartSelect();
+      }, 200);
+    }
+    on(document.getElementById('out-search'), 'input', debouncedFillOutPartSelect);
+    on(document.getElementById('out-search'), 'change', fillOutPartSelect);
+  })();
 
   on(document.getElementById('out-part'), 'change', function () {
     updateOutStockDisplay();
@@ -1008,6 +1212,7 @@
       }
       fillCustomerSelect();
     }
+    bumpDataVersion();
     persistState();
     closeModal(document.getElementById('contacts-modal'));
     renderContacts();
@@ -1046,6 +1251,7 @@
         state.customers = state.customers.filter(function (x) { return x.id !== id; });
         fillCustomerSelect();
       }
+      bumpDataVersion();
       persistState();
       renderContacts();
     }
@@ -1086,6 +1292,7 @@
     var qty = (document.getElementById('out-qty') && document.getElementById('out-qty').value);
     var customer = getOutCustomerValue();
     var operator = (document.getElementById('out-operator') && document.getElementById('out-operator').value.trim()) || state.settings.defaultOperator;
+    var paymentStatus = (document.getElementById('out-payment-status') && document.getElementById('out-payment-status').value) || 'booked';
     if (!productId) {
       showSettingsHint('请选择配件', false);
       return;
@@ -1094,10 +1301,13 @@
       showSettingsHint('请选择或填写客户', false);
       return;
     }
-    var ok = outByProductFIFO(productId, qty, customer, operator);
+    var ok = outByProductFIFO(productId, qty, customer, operator, paymentStatus);
     if (ok) {
       this.reset();
       if (document.getElementById('out-operator')) document.getElementById('out-operator').value = state.settings.defaultOperator;
+      if (document.getElementById('out-payment-status')) document.getElementById('out-payment-status').value = 'booked';
+      var qEl = document.getElementById('out-qty');
+      if (qEl) qEl.value = '1';
       fillOutPartSelect();
       fillCustomerSelect();
       updateOutStockDisplay();
@@ -1209,7 +1419,7 @@
     var threshold = state.settings.lowStockThreshold || 5;
     var tbody = document.getElementById('stock-tbody');
     if (!tbody) return;
-    tbody.innerHTML = list
+    var html = list
       .map(function (row, i) {
         var b = row.batch;
         var p = row.product;
@@ -1241,18 +1451,22 @@
           '<td>' + costStr + '</td>' +
           '<td>' + saleStr + '</td>' +
           '<td class="cell-amount">' + stockValStr + '</td>' +
-          '<td>' + status.text + '</td>' +
+          '<td><span class="tag tag-' + (status.rowClass === 'row-high' ? 'success' : status.rowClass === 'row-low' || status.rowClass === 'row-out' ? 'danger' : 'normal') + '">' + status.text + '</span></td>' +
           '<td>' + opCell + '</td>' +
           '</tr>'
         );
       })
       .join('');
-
-    document.querySelectorAll('#stock-table th').forEach(function (th) {
-      th.classList.remove('sort-asc', 'sort-desc');
-      if (th.dataset.sort === state.stockSort.key) {
-        th.classList.add(state.stockSort.dir === 1 ? 'sort-asc' : 'sort-desc');
-      }
+    var sortKey = state.stockSort.key;
+    var sortDir = state.stockSort.dir;
+    requestAnimationFrame(function () {
+      tbody.innerHTML = html;
+      document.querySelectorAll('#stock-table th').forEach(function (th) {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (th.dataset.sort === sortKey) {
+          th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+        }
+      });
     });
   }
 
@@ -1475,6 +1689,7 @@
     var qtyVal = document.getElementById('stock-edit-qty').value;
     batch.quantity = qtyVal === '' ? 0 : Math.max(0, parseInt(qtyVal, 10));
     batch.updatedAt = now();
+    bumpDataVersion();
     persistState();
     pendingEditImage = '';
     closeModal(document.getElementById('stock-edit-modal'));
@@ -1494,6 +1709,7 @@
     if (!batch) return;
     if (!confirm('确定要删除该批次「' + (batch.partCode || '') + ' ' + (batch.partName || '') + (batch.supplier ? ' · ' + batch.supplier : '') + '」吗？删除后该批次将从库存列表移除，流水记录会保留。')) return;
     state.batches = state.batches.filter(function (b) { return b.id !== batchId; });
+    bumpDataVersion();
     persistState();
     renderStock();
     showSettingsHint('已删除', true);
@@ -1549,7 +1765,20 @@
     renderStock();
   });
 
-  on(document.getElementById('btn-search'), 'click', renderStock);
+  var stockSearchDebounceTimer = null;
+  var STOCK_SEARCH_DEBOUNCE_MS = 280;
+  on(document.getElementById('search-input'), 'input', function () {
+    if (stockSearchDebounceTimer) clearTimeout(stockSearchDebounceTimer);
+    stockSearchDebounceTimer = setTimeout(function () {
+      stockSearchDebounceTimer = null;
+      renderStock();
+    }, STOCK_SEARCH_DEBOUNCE_MS);
+  });
+  on(document.getElementById('btn-search'), 'click', function () {
+    if (stockSearchDebounceTimer) clearTimeout(stockSearchDebounceTimer);
+    stockSearchDebounceTimer = null;
+    renderStock();
+  });
   on(document.getElementById('filter-low-only'), 'click', function () {
     this.classList.toggle('active');
     renderStock();
@@ -1701,7 +1930,7 @@
     var list = getFilteredRecords();
     var tbody = document.getElementById('records-tbody');
     if (!tbody) return;
-    tbody.innerHTML = list
+    var html = list
       .map(function (t) {
         var partName = getPartName(t.productId || t.partId);
         if (partName === '-' && !t.partCode) return '';
@@ -1717,6 +1946,7 @@
         );
       })
       .join('');
+    requestAnimationFrame(function () { tbody.innerHTML = html; });
   }
 
   function openRecordDetail(txId) {
@@ -1836,37 +2066,80 @@
     el.innerHTML = html;
   }
 
-  function printOutboundSlip() {
-    const outList = state.transactions.filter(function (t) { return t.type === 'out'; }).slice(-20).reverse();
-    const area = document.getElementById('print-outbound-area');
-    if (!area) return;
-    let html = '<h2 style="font-size:16px;">出库单</h2><p style="font-size:12px;">打印时间：' + new Date().toLocaleString('zh-CN') + '</p>';
-    html += '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%;">';
-    html += '<tr><th>时间</th><th>配件编码</th><th>配件名称</th><th>数量</th><th>客户</th><th>操作人</th></tr>';
-    outList.forEach(function (t) {
-      html += '<tr><td>' + (t.time ? new Date(t.time).toLocaleString('zh-CN') : '') + '</td><td>' + (t.partCode || '') + '</td><td>' + escapeHtml(getPartName(t.productId || t.partId)) + '</td><td>' + (t.quantity ?? '') + '</td><td>' + (t.supplierOrCustomer || '') + '</td><td>' + (t.operator || '') + '</td></tr>';
+  /** 出库记录：按当前筛选条件打印该时间段内所有出库明细 */
+  function getFilteredOutRecords() {
+    var params = getRecordsFilterParams();
+    var list = state.transactions.filter(function (t) {
+      if (t.type !== 'out') return false;
+      if (params.keyword) {
+        var name = getPartName(t.productId || t.partId);
+        if (!(t.partCode || '').toLowerCase().includes(params.keyword) && !(name || '').toLowerCase().includes(params.keyword)) return false;
+      }
+      if (params.modelId) {
+        var product = getProductById(t.productId || t.partId);
+        if (!product || product.modelId !== params.modelId) return false;
+      }
+      if (params.customer && (t.supplierOrCustomer || '').trim() !== params.customer) return false;
+      if (params.dateFrom && t.time && t.time.slice(0, 10) < params.dateFrom) return false;
+      if (params.dateTo && t.time && t.time.slice(0, 10) > params.dateTo) return false;
+      return true;
     });
+    return list.slice().sort(function (a, b) { return (b.time || '').localeCompare(a.time || ''); });
+  }
+
+  function openPrintOutboundWindow(rows, customerName, timeLabel) {
+    var cust = state.customers.find(function (c) { return (c.name || '').trim() === (customerName || '').trim(); });
+    var phone = (cust && cust.phone) ? cust.phone : '—';
+    var totalQty = 0;
+    var totalAmount = 0;
+    rows.forEach(function (r) { totalQty += r.qty; totalAmount += r.total; });
+    var html = '<h2 style="font-size:16px;margin:0 0 12px;">出库单</h2>';
+    html += '<table border="0" cellpadding="4" cellspacing="0" style="font-size:12px;width:100%;margin-bottom:12px;">';
+    html += '<tr><td style="padding:2px 12px 2px 0;">客户</td><td>' + escapeHtml(customerName || '—') + '</td></tr>';
+    html += '<tr><td style="padding:2px 12px 2px 0;">时间</td><td>' + escapeHtml(timeLabel) + '</td></tr>';
+    html += '<tr><td style="padding:2px 12px 2px 0;">联系电话</td><td>' + escapeHtml(phone) + '</td></tr>';
     html += '</table>';
-    area.innerHTML = html;
-    area.style.position = 'fixed';
-    area.style.left = '0';
-    area.style.top = '0';
-    area.style.width = '800px';
-    area.style.background = '#fff';
-    area.style.padding = '20px';
-    area.style.zIndex = '99999';
+    html += '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:12px;width:100%;">';
+    html += '<tr><th>编码</th><th>名称</th><th>数量</th><th>单价(KIP)</th><th>总价(KIP)</th></tr>';
+    rows.forEach(function (r) {
+      html += '<tr><td>' + escapeHtml(r.code) + '</td><td>' + escapeHtml(r.name) + '</td><td>' + r.qty + '</td><td>' + formatKip(r.unitPrice) + '</td><td>' + formatKip(r.total) + '</td></tr>';
+    });
+    html += '<tr style="font-weight:bold;"><td colspan="2">合计</td><td>' + totalQty + '</td><td></td><td>' + formatKip(totalAmount) + '</td></tr>';
+    html += '</table>';
     var win = window.open('', '_blank');
-    win.document.write('<html><head><title>出库单</title></head><body>' + html + '</body></html>');
+    win.document.write('<html><head><title>出库单</title><style>body{font-family:inherit;padding:20px;}</style></head><body>' + html + '</body></html>');
     win.document.close();
     win.focus();
     setTimeout(function () { win.print(); win.close(); }, 300);
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
   }
 
-  on(document.getElementById('btn-print-outbound'), 'click', printOutboundSlip);
+  function printOutboundSlipFromRecords() {
+    var list = getFilteredOutRecords();
+    if (list.length === 0) {
+      showSettingsHint('当前筛选条件下没有出库记录', false);
+      return;
+    }
+    var params = getRecordsFilterParams();
+    var timeLabel = params.dateFrom && params.dateTo ? params.dateFrom + ' 至 ' + params.dateTo : (params.dateFrom || params.dateTo || '全部');
+    var customerName = params.customer ? params.customer : (list.length && list.every(function (t) { return (t.supplierOrCustomer || '').trim() === (list[0].supplierOrCustomer || '').trim(); }) ? (list[0].supplierOrCustomer || '').trim() : '多客户');
+    var rows = list.map(function (t) {
+      var u = t.salePrice != null ? Number(t.salePrice) : 0;
+      var q = t.quantity || 0;
+      return {
+        code: t.partCode || '',
+        name: getPartName(t.productId || t.partId) || '',
+        qty: q,
+        unitPrice: u,
+        total: q * u,
+      };
+    });
+    openPrintOutboundWindow(rows, customerName, timeLabel);
+  }
+
+  on(document.getElementById('btn-records-print-outbound'), 'click', printOutboundSlipFromRecords);
 
   function getCustomerStatsList() {
+    var keyword = ((document.getElementById('customerStats-keyword') && document.getElementById('customerStats-keyword').value) || '').trim().toLowerCase();
     var dateFrom = (document.getElementById('customerStats-dateFrom') && document.getElementById('customerStats-dateFrom').value) || '';
     var dateTo = (document.getElementById('customerStats-dateTo') && document.getElementById('customerStats-dateTo').value) || '';
     var list = state.transactions.filter(function (t) { return t.type === 'out'; });
@@ -1875,16 +2148,27 @@
     var byCustomer = {};
     list.forEach(function (t) {
       var name = (t.supplierOrCustomer || '').trim() || '（未填客户）';
-      if (!byCustomer[name]) byCustomer[name] = { count: 0, qty: 0, sales: 0, lastTime: '' };
+      if (!byCustomer[name]) byCustomer[name] = { count: 0, qty: 0, sales: 0, debt: 0, cost: 0, firstTime: '', lastTime: '' };
       byCustomer[name].count += 1;
-      byCustomer[name].qty += t.quantity || 0;
-      byCustomer[name].sales += (t.quantity || 0) * (t.salePrice != null ? t.salePrice : 0);
-      if (t.time && (!byCustomer[name].lastTime || t.time > byCustomer[name].lastTime)) byCustomer[name].lastTime = t.time;
+      var q = t.quantity || 0;
+      var sale = t.salePrice != null ? t.salePrice : 0;
+      var cost = t.costPrice != null ? t.costPrice : 0;
+      byCustomer[name].qty += q;
+      byCustomer[name].sales += q * sale;
+      byCustomer[name].cost += q * cost;
+      if (t.paymentStatus === 'booked') byCustomer[name].debt += q * sale;
+      if (t.time) {
+        if (!byCustomer[name].firstTime || t.time < byCustomer[name].firstTime) byCustomer[name].firstTime = t.time;
+        if (!byCustomer[name].lastTime || t.time > byCustomer[name].lastTime) byCustomer[name].lastTime = t.time;
+      }
     });
-    return Object.keys(byCustomer).map(function (name) {
+    var rows = Object.keys(byCustomer).map(function (name) {
       var o = byCustomer[name];
-      return { name: name, count: o.count, qty: o.qty, sales: o.sales, lastTime: o.lastTime };
+      var profit = (o.sales || 0) - (o.cost || 0);
+      return { name: name, count: o.count, qty: o.qty, sales: o.sales, debt: o.debt || 0, profit: profit, firstTime: o.firstTime, lastTime: o.lastTime };
     }).sort(function (a, b) { return (b.sales - a.sales); });
+    if (keyword) rows = rows.filter(function (r) { return (r.name || '').toLowerCase().indexOf(keyword) !== -1; });
+    return rows;
   }
 
   function renderCustomerStats() {
@@ -1893,24 +2177,31 @@
     if (!tbody) return;
     tbody.innerHTML = list.map(function (row) {
       var salesStr = row.sales != null ? formatKip(row.sales) : '0.000';
-      var lastStr = row.lastTime ? new Date(row.lastTime).toLocaleDateString('zh-CN') : '-';
-      return '<tr><td>' + escapeHtml(row.name) + '</td><td>' + row.count + '</td><td>' + row.qty + '</td><td class="cell-amount">' + salesStr + '</td><td>' + lastStr + '</td></tr>';
+      var debtStr = row.debt != null ? formatKip(row.debt) : '0.000';
+      var profitStr = row.profit != null ? formatKip(row.profit) : '0.000';
+      var firstStr = row.firstTime ? new Date(row.firstTime).toLocaleDateString('zh-CN') : '';
+      var lastStr = row.lastTime ? new Date(row.lastTime).toLocaleDateString('zh-CN') : '';
+      var rangeStr = firstStr && lastStr ? (firstStr === lastStr ? firstStr : firstStr + ' 至 ' + lastStr) : (lastStr || firstStr || '-');
+      return '<tr><td>' + escapeHtml(row.name) + '</td><td>' + row.count + '</td><td>' + row.qty + '</td><td class="cell-amount">' + salesStr + '</td><td class="cell-amount">' + debtStr + '</td><td class="cell-amount">' + profitStr + '</td><td>' + rangeStr + '</td></tr>';
     }).join('');
   }
 
   on(document.getElementById('btn-customerStats-search'), 'click', renderCustomerStats);
   on(document.getElementById('btn-customerStats-reset'), 'click', function () {
+    var kw = document.getElementById('customerStats-keyword');
     var from = document.getElementById('customerStats-dateFrom');
     var to = document.getElementById('customerStats-dateTo');
+    if (kw) kw.value = '';
     if (from) from.value = '';
     if (to) to.value = '';
     renderCustomerStats();
   });
+  on(document.getElementById('customerStats-filter-form'), 'submit', function (e) {
+    e.preventDefault();
+    renderCustomerStats();
+  });
 
   function renderSettings() {
-    const thresholdEl = document.getElementById('low-stock-threshold');
-    if (thresholdEl) thresholdEl.value = state.settings.lowStockThreshold ?? 5;
-
     const listModels = document.getElementById('list-models');
     if (listModels) {
       listModels.innerHTML = state.models
@@ -1978,12 +2269,6 @@
     });
   }
 
-  function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
-  }
-
   function confirmDeleteCategory(type, name) {
     return confirm('确定要删除分类「' + name + '」吗？删除后相关配件的该分类将显示为空。');
   }
@@ -1993,6 +2278,7 @@
     const name = (input.value || '').trim();
     if (!name) return;
     state.models.push({ id: id(), name });
+    bumpDataVersion();
     persistState();
     input.value = '';
     fillInFormSelects();
@@ -2006,6 +2292,7 @@
     const name = (input.value || '').trim();
     if (!name) return;
     state.mainTypes.push({ id: id(), name });
+    bumpDataVersion();
     persistState();
     input.value = '';
     fillInFormSelects();
@@ -2019,6 +2306,7 @@
     const name = (input.value || '').trim();
     if (!name || !parentId) return;
     state.subTypes.push({ id: id(), mainTypeId: parentId, name });
+    bumpDataVersion();
     persistState();
     input.value = '';
     fillInFormSelects();
@@ -2032,6 +2320,7 @@
     const m = state.models.find((x) => x.id === mid);
     if (!m || !confirmDeleteCategory('model', m.name)) return;
     state.models = state.models.filter((x) => x.id !== mid);
+    bumpDataVersion();
     persistState();
     fillInFormSelects();
     fillFilterSelects();
@@ -2047,6 +2336,7 @@
     if (!t || !confirmDeleteCategory('mainType', t.name)) return;
     state.mainTypes = state.mainTypes.filter((x) => x.id !== tid);
     state.subTypes = state.subTypes.filter((s) => s.mainTypeId !== tid);
+    bumpDataVersion();
     persistState();
     fillInFormSelects();
     fillFilterSelects();
@@ -2060,18 +2350,10 @@
     const s = state.subTypes.find((x) => x.id === sid);
     if (!s || !confirmDeleteCategory('subType', s.name)) return;
     state.subTypes = state.subTypes.filter((x) => x.id !== sid);
+    bumpDataVersion();
     persistState();
     fillInFormSelects();
     renderSettings();
-  });
-
-  on(document.getElementById('save-threshold'), 'click', function () {
-    const v = parseInt(document.getElementById('low-stock-threshold').value, 10);
-    if (!isNaN(v) && v >= 0) {
-      state.settings.lowStockThreshold = v;
-      persistState();
-      showSettingsHint('阈值已保存', true);
-    }
   });
 
   function exportJson() {
@@ -2093,6 +2375,8 @@
     a.download = 'aw_part_stock_' + new Date().toISOString().slice(0, 10) + '.json';
     a.click();
     URL.revokeObjectURL(a.href);
+    state.unsavedToJsonFile = false;
+    updateUnsavedBanner();
     showSettingsHint('已导出 JSON', true);
   }
 
@@ -2193,6 +2477,7 @@
             migratePartsToProductsBatches();
           }
         }
+        bumpDataVersion();
         persistState();
         fillInFormSelects();
         fillFilterSelects();
@@ -2215,5 +2500,52 @@
   });
 
   loadState();
+  state.unsavedToJsonFile = false;
+  updateUnsavedBanner();
+
+  (function startAutoBackup() {
+    var BACKUP_KEY = 'aw_auto_backup';
+    var BACKUP_TIME_KEY = 'aw_auto_backup_time';
+    var INTERVAL_MS = 5 * 60 * 1000;
+    function doAutoBackup() {
+      try {
+        var data = {
+          exportTime: now(),
+          products: state.products,
+          batches: state.batches,
+          transactions: state.transactions,
+          models: state.models,
+          mainTypes: state.mainTypes,
+          subTypes: state.subTypes,
+          suppliers: state.suppliers,
+          customers: state.customers,
+          settings: state.settings,
+        };
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
+        localStorage.setItem(BACKUP_TIME_KEY, new Date().toISOString());
+      } catch (e) {}
+    }
+    setInterval(doAutoBackup, INTERVAL_MS);
+    doAutoBackup();
+  })();
+
+  function flushPersistState() {
+    if (persistStateTimer) {
+      clearTimeout(persistStateTimer);
+      persistStateTimer = null;
+      persistStateImmediate(true);
+    }
+  }
+  function onBeforeUnload(e) {
+    flushPersistState();
+    if (state.unsavedToJsonFile) {
+      e.preventDefault();
+      e.returnValue = '您有未保存的修改，请先导出 JSON 后再关闭。';
+      return e.returnValue;
+    }
+  }
+  window.addEventListener('beforeunload', onBeforeUnload);
+  window.onbeforeunload = onBeforeUnload;
+
   showPanel('dashboard');
 })();
