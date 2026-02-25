@@ -108,6 +108,7 @@
                 </nav>
               </aside>
               <div class="contacts-main">
+                <p class="table-scroll-hint" aria-hidden="true">← 左右滑动查看全部</p>
                 <div class="table-wrap">
                 <table class="data-table" id="contacts-table">
                   <thead>
@@ -219,17 +220,18 @@
             <button type="button" id="btn-export-stock-csv" class="btn btn-outline">导出 CSV</button>
           </div>
           <div class="content-card card">
+            <p class="table-scroll-hint" aria-hidden="true">← 左右滑动查看全部</p>
             <div class="table-wrap">
               <table class="data-table data-table-stock" id="stock-table">
               <thead>
                 <tr>
                   <th data-sort="code">编码 <span class="sort-icon"></span></th>
-                  <th data-sort="name">名称 <span class="sort-icon"></span></th>
                   <th data-sort="brand">品牌 <span class="sort-icon"></span></th>
+                  <th data-sort="name">名称 <span class="sort-icon"></span></th>
                   <th data-sort="quantity">库存 <span class="sort-icon"></span></th>
+                  <th data-sort="unit">单位 <span class="sort-icon"></span></th>
                   <th data-sort="costPrice">成本价 <span class="sort-icon"></span></th>
                   <th data-sort="salePrice">售价 <span class="sort-icon"></span></th>
-                  <th data-sort="stockValue">库存金额 <span class="sort-icon"></span></th>
                   <th>状态</th>
                   <th>操作</th>
                 </tr>
@@ -265,12 +267,12 @@
                 <div class="field"><label>配件编码</label><input type="text" id="stock-edit-code" readonly class="readonly"></div>
                 <div class="field"><label>名称</label><input type="text" id="stock-edit-name" required></div>
                 <div class="field"><label>品牌</label><input type="text" id="stock-edit-brand" placeholder="品牌"></div>
-                <div class="field"><label>单位</label><input type="text" id="stock-edit-unit" placeholder="KIP"></div>
-                <div class="field"><label>成本价(KIP)</label><input type="number" id="stock-edit-costPrice" min="0" step="0.001" placeholder="如 100.000"></div>
-                <div class="field"><label>参考售价(KIP)</label><input type="number" id="stock-edit-salePrice" min="0" step="0.001" placeholder="如 100.000"></div>
+                <div class="field"><label>数量单位</label><select id="stock-edit-unit"><option value="个">个</option><option value="件">件</option><option value="套">套</option><option value="只">只</option><option value="台">台</option><option value="支">支</option><option value="箱">箱</option><option value="条">条</option></select></div>
+                <div class="field"><label>成本价（KIP）</label><input type="number" id="stock-edit-costPrice" min="0" step="any" placeholder="纯数字"></div>
+                <div class="field"><label>参考售价（KIP）</label><input type="number" id="stock-edit-salePrice" min="0" step="any" placeholder="纯数字"></div>
                 <div class="field"><label>厂家</label><input type="text" id="stock-edit-supplier" placeholder="供应商/厂家"></div>
                 <div class="field"><label>质量</label><select id="stock-edit-quality"><option value="">请选择</option></select></div>
-                <div class="field"><label>库存数量</label><input type="number" id="stock-edit-qty" min="0"></div>
+                <div class="field"><label>当前数量</label><input type="number" id="stock-edit-qty" min="0" readonly class="readonly" title="由入库/出库自动计算"></div>
                 <div class="field"><label>车型</label><select id="stock-edit-model"></select></div>
                 <div class="field"><label>主件类别</label><select id="stock-edit-mainType"></select></div>
                 <div class="field"><label>子件类别</label><select id="stock-edit-subType"></select></div>
@@ -353,9 +355,17 @@
             <div class="in-card-block">
               <h3 class="in-card-title">入库信息</h3>
             <div class="in-info-grid">
-              <div class="field"><label>入库数量 *</label><input type="number" id="in-qty" min="1" required placeholder="必填"></div>
-              <div class="field"><label>成本价(KIP) *</label><input type="number" id="in-costPrice" min="0" step="0.001" required placeholder="如 100.000"></div>
-              <div class="field"><label>参考售价(KIP)</label><input type="number" id="in-salePrice" min="0" step="0.001" placeholder="如 100.000"></div>
+              <div class="field">
+                <label>入库数量 *</label>
+                <span class="field-with-unit">
+                  <input type="number" id="in-qty" min="1" required placeholder="必填">
+                  <select id="in-unit" class="unit-select" aria-label="单位">
+                    <option value="个">个</option><option value="件">件</option><option value="套">套</option><option value="只">只</option><option value="台">台</option><option value="支">支</option><option value="箱">箱</option><option value="条">条</option>
+                  </select>
+                </span>
+              </div>
+              <div class="field"><label>成本价（KIP）*</label><input type="number" id="in-costPrice" min="0" step="any" required placeholder="纯数字"></div>
+              <div class="field"><label>参考售价（KIP）</label><input type="number" id="in-salePrice" min="0" step="any" placeholder="纯数字"></div>
               <div class="field"><label>质量等级</label><select id="in-quality"><option value="正常" selected>正常</option><option value="好">好</option><option value="差">差</option></select></div>
             </div>
               <div class="in-meta-row">
@@ -415,13 +425,18 @@
                   <div class="out-stock-card-inner">
                     <div class="out-stock-label">库存状态</div>
                     <div id="out-stock-current" class="out-stock-current">—</div>
-                    <div id="out-stock-threshold" class="out-stock-meta">最低警戒：— 件</div>
+                    <div id="out-stock-threshold" class="out-stock-meta">最低警戒：—</div>
                     <div id="out-stock-status" class="out-stock-status">—</div>
                   </div>
                 </div>
                 <div class="out-field">
                   <label>出库数量</label>
-                  <input type="number" id="out-qty" class="out-input" min="1" required placeholder="数量">
+                  <span class="field-with-unit">
+                    <input type="number" id="out-qty" class="out-input" min="1" required placeholder="数量">
+                    <select id="out-unit" class="unit-select" aria-label="单位" title="与库存管理单位一致，不可修改">
+                      <option value="个">个</option><option value="件">件</option><option value="套">套</option><option value="只">只</option><option value="台">台</option><option value="支">支</option><option value="箱">箱</option><option value="条">条</option>
+                    </select>
+                  </span>
                 </div>
                 <div id="out-insufficient-warn" class="out-insufficient-warn" style="display:none;"></div>
               </div>
@@ -509,6 +524,7 @@
           </div>
           <div id="records-stats" class="content-card card records-stats-block"></div>
           <div class="section-body content-card card records-table-card">
+            <p class="table-scroll-hint" aria-hidden="true">← 左右滑动查看全部</p>
             <div class="table-wrap records-table-wrap">
               <table class="data-table data-table-records" id="records-table">
                 <thead>
@@ -577,9 +593,9 @@
                   <th>客户</th>
                   <th>出库笔数</th>
                   <th>总数量</th>
-                  <th>总销售额(KIP)</th>
-                  <th>当前欠款(KIP)</th>
-                  <th>累计利润(KIP)</th>
+                  <th>总销售额（KIP）</th>
+                  <th>当前欠款（KIP）</th>
+                  <th>累计利润（KIP）</th>
                   <th>拿货时间范围</th>
                 </tr>
               </thead>
@@ -634,9 +650,9 @@
                       <th>日期</th>
                       <th>出库笔数</th>
                       <th>出库数量</th>
-                      <th>销售额(KIP)</th>
-                      <th>成本(KIP)</th>
-                      <th>毛利润(KIP)</th>
+                      <th>销售额（KIP）</th>
+                      <th>成本（KIP）</th>
+                      <th>毛利润（KIP）</th>
                     </tr>
                   </thead>
                   <tbody id="profit-daily-tbody"></tbody>
