@@ -2162,10 +2162,17 @@
       document.querySelectorAll('.dropdown-wrap.open').forEach(function (w) { if (w !== wrap) w.classList.remove('open'); });
       if (wrap) {
         if (wrap.closest('.mobile-card-stock')) {
-          var btnRect = toggle.getBoundingClientRect();
-          var menuHeight = 220;
-          var spaceBelow = (window.innerHeight || document.documentElement.clientHeight) - btnRect.bottom;
-          wrap.classList.toggle('dropdown-up', spaceBelow < menuHeight);
+          var listEl = getEl('stock-card-list');
+          var cardEl = wrap.closest('.mobile-card-stock');
+          var isFirstCard = listEl && cardEl && listEl.querySelector('.mobile-card-stock') === cardEl;
+          if (isFirstCard) {
+            wrap.classList.remove('dropdown-up');
+          } else {
+            var btnRect = toggle.getBoundingClientRect();
+            var menuHeight = 220;
+            var spaceBelow = (window.innerHeight || document.documentElement.clientHeight) - btnRect.bottom;
+            wrap.classList.toggle('dropdown-up', spaceBelow < menuHeight);
+          }
         }
         wrap.classList.toggle('open');
       }
