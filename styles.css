@@ -235,7 +235,25 @@ body .filter-form select {
   background: var(--content-bg);
 }
 
+/* 顶部保存状态指示灯：绿=已保存，红=未保存（手机端替代红底白字横幅） */
+.unsaved-indicator {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 4px;
+  background: var(--success, #22c55e);
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+.unsaved-indicator.is-unsaved {
+  background: var(--danger, #dc2626);
+}
+.unsaved-indicator-dot {
+  display: none;
+}
+
 .unsaved-banner {
+  display: none !important;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -1160,6 +1178,20 @@ input.readonly {
 .out-stock-card.out-stock-status-normal .out-stock-status { color: var(--success); }
 .out-stock-card.out-stock-status-low .out-stock-status { color: var(--danger); }
 
+.out-unit-price-wrap {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.out-unit-price-wrap .out-unit-price-label { margin-right: 6px; }
+.out-unit-price {
+  font-weight: 700;
+  color: var(--amount, var(--text));
+  font-variant-numeric: tabular-nums;
+}
+
 .out-insufficient-warn {
   margin-top: 16px;
   padding: 14px 16px;
@@ -1189,9 +1221,21 @@ input.readonly {
 .out-preview-body {
   font-size: 0.95rem;
   color: var(--text);
-  line-height: 1.5;
-  white-space: pre-wrap;
+  line-height: 1.6;
 }
+.out-preview-body .out-preview-placeholder,
+.out-preview-body .out-preview-line {
+  margin: 0 0 6px;
+}
+.out-preview-body .out-preview-line:last-child { margin-bottom: 0; }
+.out-preview-body .out-preview-desc { font-weight: 600; }
+.out-preview-body .out-preview-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--card-border);
+  color: var(--amount, var(--text));
+}
+.out-preview-body .out-preview-total strong { font-variant-numeric: tabular-nums; }
 
 /* 出库按钮：主次分明 */
 .out-actions {
@@ -2914,8 +2958,9 @@ body.sidebar-open .sidebar-overlay {
   body { overflow-x: hidden; }
   body.sidebar-open { overflow: hidden; }
   .app-main { overflow-x: hidden; }
-  .unsaved-banner {
-    padding-top: max(48px, calc(44px + env(safe-area-inset-top)));
+  .unsaved-indicator {
+    height: 6px;
+    border-radius: 0 0 4px 4px;
   }
   .sidebar-toggle {
     display: block;
@@ -3117,6 +3162,20 @@ body.sidebar-open .sidebar-overlay {
     grid-template-columns: 1fr;
   }
   .stock-cards { grid-template-columns: 1fr; }
+  /* 库存卡片手机端：「更多」下拉不溢出盒子，菜单左对齐在按钮左侧、向上展开 */
+  .mobile-card-stock,
+  .mobile-card-stock .mobile-card-actions {
+    overflow: visible;
+  }
+  .mobile-card-stock .dropdown-wrap .dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 140px;
+    z-index: 200;
+  }
+  .stock-cards-wrap .mobile-card-list {
+    overflow: visible;
+  }
   /* 欠款管理：手机端显示卡片、隐藏表格 */
   .debt-table-wrap,
   .payments-table-wrap {
