@@ -17,6 +17,22 @@
     return id ? document.getElementById(id) : null;
   }
 
+  /** 高频使用的 DOM 引用缓存，初始化时填充，减少重复 query */
+  var dom = {};
+  function cacheDom() {
+    dom.toast = getEl('toast');
+    dom.toastText = getEl('toast-text');
+    dom.settingsHint = getEl('settings-hint');
+    dom.unsavedBanner = getEl('unsaved-banner');
+    dom.unsavedIndicator = getEl('unsaved-indicator');
+    dom.content = getEl('content');
+    dom.sidebarNav = getEl('sidebar-nav');
+    dom.formIn = getEl('form-in');
+    dom.formOut = getEl('form-out');
+    dom.fileImport = getEl('file-import');
+    dom.btnExport = getEl('btn-export');
+  }
+
   function escapeHtml(s) {
     if (s == null) return '';
     var div = document.createElement('div');
@@ -53,8 +69,8 @@
   }
 
   function showToast(text, success) {
-    var el = getEl('toast');
-    var textEl = getEl('toast-text');
+    var el = dom.toast || getEl('toast');
+    var textEl = dom.toastText || getEl('toast-text');
     if (!el || !textEl) return;
     textEl.textContent = text;
     el.classList.remove('toast-success', 'toast-error');
@@ -68,7 +84,7 @@
 
   function showSettingsHint(text, success) {
     showToast(text, success);
-    var el = getEl('settings-hint');
+    var el = dom.settingsHint || getEl('settings-hint');
     if (!el) return;
     el.textContent = text;
     el.className = 'settings-hint settings-hint-block hint' + (success === false ? ' error' : '');
@@ -286,9 +302,9 @@
   }
 
   function updateUnsavedBanner() {
-    var banner = getEl('unsaved-banner');
+    var banner = dom.unsavedBanner || getEl('unsaved-banner');
     if (banner) banner.style.display = state.unsavedToJsonFile ? 'block' : 'none';
-    var indicator = getEl('unsaved-indicator');
+    var indicator = dom.unsavedIndicator || getEl('unsaved-indicator');
     if (indicator) indicator.classList.toggle('is-unsaved', !!state.unsavedToJsonFile);
   }
 
@@ -3206,9 +3222,21 @@
     reader.readAsText(file, 'UTF-8');
   });
 
+  cacheDom();
   loadState();
   state.unsavedToJsonFile = false;
   updateUnsavedBanner();
+
+  /* 事件绑定入口一览（便于维护）：
+   * 侧栏/导航：sidebar-toggle, sidebar-overlay, content(委托), sidebar-nav(委托)
+   * 入库：form-in(change/submit), in-part-search, in-part-dropdown, in-advanced-wrap, in-supplier-select, document(click 收起下拉)
+   * 出库：form-out(submit), out-search, out-part, out-qty, out-customer*, out-payment-status, out-operator
+   * 库存：panel-stock(委托 缩略图/更多/编辑/删除/流水), stock-table(排序), filter-*, stock-detail-*, stock-edit-*, stock-log-*
+   * 记录/利润/欠款/客户统计：records-*, profit-*, debt-*, customerStats-*, payments-*
+   * 联系人：contacts-*, contact-card(委托)
+   * 设置/分类：settings-*, categories-*
+   * 全局：btn-export, file-import, beforeunload
+   */
 
   (function startAutoBackup() {
     var BACKUP_KEY = 'aw_auto_backup';
