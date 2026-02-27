@@ -49,6 +49,7 @@
   <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
   <!-- 右侧主内容：左侧菜单点击后只显示一个模块，其他隐藏 -->
   <div class="app-main">
+    <div id="unsaved-indicator" class="unsaved-indicator" role="status" aria-label="保存状态"><span class="unsaved-indicator-dot"></span></div>
     <div id="unsaved-banner" class="unsaved-banner" role="alert" aria-live="polite" style="display:none;">
       您有未保存的修改，请先点击左侧「导出 JSON」保存后再关闭或离开页面。
     </div>
@@ -447,6 +448,10 @@
                     <div id="out-stock-current" class="out-stock-current">—</div>
                     <div id="out-stock-threshold" class="out-stock-meta">最低警戒：—</div>
                     <div id="out-stock-status" class="out-stock-status">—</div>
+                    <div id="out-unit-price-wrap" class="out-unit-price-wrap" style="display:none;">
+                      <span class="out-unit-price-label">参考单价</span>
+                      <span id="out-unit-price" class="out-unit-price">—</span> KIP
+                    </div>
                   </div>
                 </div>
                 <div class="out-field">
