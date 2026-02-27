@@ -6,6 +6,10 @@
   --gap: 16px;
   --page-gap: 28px;
   --module-gap: 32px;
+  --spacing-xs: 6px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
   /* 圆角 */
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -54,8 +58,10 @@
   box-sizing: border-box;
 }
 
+/* 全站禁止横向滚动，移动端必须 */
 html {
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -67,6 +73,7 @@ body {
   text-align: center;
   font-size: 15px;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 body .form-in,
@@ -228,11 +235,12 @@ body .filter-form select {
   display: none;
 }
 
-/* ---------- 主内容区：留出侧栏宽度，由 body 整体滚动，无独立滚动条 ---------- */
+/* ---------- 主内容区：留出侧栏宽度，禁止横向滚动 ---------- */
 .app-main {
   margin-left: 220px;
   min-height: 100vh;
   background: var(--content-bg);
+  overflow-x: hidden;
 }
 
 /* 顶部保存状态指示灯：绿=已保存，红=未保存（手机端替代红底白字横幅） */
