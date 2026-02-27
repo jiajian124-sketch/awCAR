@@ -286,8 +286,10 @@
   }
 
   function updateUnsavedBanner() {
-    var el = getEl('unsaved-banner');
-    if (el) el.style.display = state.unsavedToJsonFile ? 'block' : 'none';
+    var banner = getEl('unsaved-banner');
+    if (banner) banner.style.display = state.unsavedToJsonFile ? 'block' : 'none';
+    var indicator = getEl('unsaved-indicator');
+    if (indicator) indicator.classList.toggle('is-unsaved', !!state.unsavedToJsonFile);
   }
 
   function getModelName(id) {
@@ -1353,9 +1355,15 @@
       if (outUnitSel) { outUnitSel.value = DEFAULT_UNIT; outUnitSel.disabled = true; }
       if (cardEl) cardEl.classList.remove('out-stock-status-normal', 'out-stock-status-low');
       if (warnEl) { warnEl.style.display = 'none'; warnEl.textContent = ''; }
+      var priceWrap = getEl('out-unit-price-wrap');
+      if (priceWrap) priceWrap.style.display = 'none';
       updateOutPreview();
       return;
     }
+    var priceWrap = getEl('out-unit-price-wrap');
+    var priceEl = getEl('out-unit-price');
+    if (priceWrap) priceWrap.style.display = 'block';
+    if (priceEl) priceEl.textContent = product.salePrice != null ? formatKip(product.salePrice) : '—';
     if (outUnitSel) { outUnitSel.value = unit; outUnitSel.disabled = true; }
     var th = getEffectiveThreshold(product);
     if (currentEl) currentEl.textContent = formatQtyWithUnit(totalQty, unit);
@@ -1389,14 +1397,23 @@
     var productId = (getEl('out-part') && getEl('out-part').value);
     var product = productId ? getProductById(productId) : null;
     var qty = ((getEl('out-qty') && getEl('out-qty').value) || '').trim();
+    var qtyNum = parseInt(qty, 10) || 0;
     var customer = getOutCustomerValue();
-    if (!product || !qty || parseInt(qty, 10) < 1) {
-      bodyEl.textContent = '请先选择配件、填写数量与客户';
+    if (!product || !qty || qtyNum < 1) {
+      bodyEl.innerHTML = '<p class="out-preview-placeholder">请先选择配件、填写数量与客户</p>';
       return;
     }
-    var desc = (product.code || '') + ' ' + (product.name || '');
-    var lines = [desc, '数量：' + qty, '客户：' + (customer || '—')];
-    bodyEl.textContent = lines.join('\n');
+    var unitPrice = product.salePrice != null ? Number(product.salePrice) : null;
+    var totalPrice = (unitPrice != null && !isNaN(unitPrice)) ? unitPrice * qtyNum : null;
+    var unitStr = unitPrice != null ? formatKip(unitPrice) : '—';
+    var totalStr = totalPrice != null ? formatKip(totalPrice) : '—';
+    var unitLabel = product.unit ? normalizeUnit(product.unit) : DEFAULT_UNIT;
+    bodyEl.innerHTML =
+      '<p class="out-preview-line out-preview-desc">' + escapeHtml((product.code || '') + ' ' + (product.name || '')) + '</p>' +
+      '<p class="out-preview-line">数量：' + escapeHtml(qty) + ' ' + escapeHtml(unitLabel) + '</p>' +
+      '<p class="out-preview-line">单价：' + unitStr + ' KIP</p>' +
+      '<p class="out-preview-line out-preview-total">总价：<strong>' + totalStr + '</strong> KIP</p>' +
+      '<p class="out-preview-line">客户：' + escapeHtml(customer || '—') + '</p>';
   }
 
   function getContactsList() {
@@ -2127,7 +2144,15 @@
     if (toggle) {
       var wrap = toggle.closest('.dropdown-wrap');
       document.querySelectorAll('.dropdown-wrap.open').forEach(function (w) { if (w !== wrap) w.classList.remove('open'); });
-      if (wrap) wrap.classList.toggle('open');
+      if (wrap) {
+        if (wrap.closest('.mobile-card-stock')) {
+          var btnRect = toggle.getBoundingClientRect();
+          var menuHeight = 220;
+          var spaceBelow = (window.innerHeight || document.documentElement.clientHeight) - btnRect.bottom;
+          wrap.classList.toggle('dropdown-up', spaceBelow < menuHeight);
+        }
+        wrap.classList.toggle('open');
+      }
       return;
     }
     var logBtn = e.target.closest('.btn-stock-log');
@@ -3158,7 +3183,9 @@
         });
         recalcBatchQuantitiesFromTransactions();
         bumpDataVersion();
-        persistState();
+        persistState(true);
+        state.unsavedToJsonFile = false;
+        updateUnsavedBanner();
         fillInFormSelects();
         fillFilterSelects();
         fillOutPartSelect();
